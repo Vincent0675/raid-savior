@@ -57,7 +57,7 @@ git clone <tu-repo>
 cd wow_telemetry_pipeline
 
 # 2. Crear entorno
-mamba create -n wow_pipeline python=3.11 -y
+mamba create -n wow_pipeline python=3.10 -y
 mamba activate wow_pipeline
 
 # 3. Instalar dependencias
