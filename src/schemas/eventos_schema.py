@@ -146,7 +146,7 @@ class WoWRaidEvent(BaseModel):
         default=None,
         ge=1,
         le=90,
-        description="Player level (1-70)"
+        description="Player level (1-90)"
     )
     
     # ====== ACCIÓN (Ability) ======

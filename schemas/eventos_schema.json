@@ -1,0 +1,464 @@
+{
+  "$defs": {
+    "DamageSchool": {
+      "description": "Escuelas de daño/curación en WoW.",
+      "enum": [
+        "physical",
+        "fire",
+        "frost",
+        "nature",
+        "shadow",
+        "arcane",
+        "holy",
+        "chaos"
+      ],
+      "title": "DamageSchool",
+      "type": "string"
+    },
+    "EntityType": {
+      "description": "Tipos de entidades en combate.",
+      "enum": [
+        "player",
+        "boss",
+        "add",
+        "interactive"
+      ],
+      "title": "EntityType",
+      "type": "string"
+    },
+    "EventType": {
+      "description": "Tipos de eventos soportados.",
+      "enum": [
+        "combat_damage",
+        "heal",
+        "player_death",
+        "spell_cast",
+        "boss_phase",
+        "mana_regeneration"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "PlayerClass": {
+      "description": "Clases de WoW (Retail, Dragonflight 10.2.5).",
+      "enum": [
+        "warrior",
+        "paladin",
+        "hunter",
+        "rogue",
+        "priest",
+        "shaman",
+        "mage",
+        "warlock",
+        "druid",
+        "death_knight",
+        "monk"
+      ],
+      "title": "PlayerClass",
+      "type": "string"
+    },
+    "PlayerRole": {
+      "description": "Roles de jugadores en raid.",
+      "enum": [
+        "tank",
+        "healer",
+        "dps"
+      ],
+      "title": "PlayerRole",
+      "type": "string"
+    },
+    "ResourceType": {
+      "description": "Tipos de recursos (para mana_regeneration).",
+      "enum": [
+        "mana",
+        "energy",
+        "rage",
+        "focus",
+        "runic_power"
+      ],
+      "title": "ResourceType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Schema principal para eventos de raid WoW.\n\nImplementa validación estricta (Schema-on-Write) antes de ingesta en Bronze.",
+  "properties": {
+    "event_id": {
+      "description": "Unique event identifier (UUID v4)",
+      "format": "uuid",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_type": {
+      "$ref": "#/$defs/EventType",
+      "description": "Type of event (damage, heal, death, etc.)"
+    },
+    "timestamp": {
+      "description": "When the event occurred (ISO 8601 with timezone)",
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "raid_id": {
+      "description": "Raid identifier (e.g., raid001)",
+      "pattern": "^raid\\d{3}$",
+      "title": "Raid Id",
+      "type": "string"
+    },
+    "encounter_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Boss encounter identifier (optional)",
+      "title": "Encounter Id"
+    },
+    "encounter_duration_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Duration of encounter in milliseconds",
+      "title": "Encounter Duration Ms"
+    },
+    "source_player_id": {
+      "description": "Unique player identifier",
+      "minLength": 1,
+      "title": "Source Player Id",
+      "type": "string"
+    },
+    "source_player_name": {
+      "description": "Player name",
+      "maxLength": 12,
+      "minLength": 1,
+      "title": "Source Player Name",
+      "type": "string"
+    },
+    "source_player_role": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlayerRole"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Player role (tank, healer, dps)"
+    },
+    "source_player_class": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlayerClass"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Player class (warrior, mage, etc.)"
+    },
+    "source_player_level": {
+      "anyOf": [
+        {
+          "maximum": 90,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Player level (1-90)",
+      "title": "Source Player Level"
+    },
+    "ability_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Ability/spell identifier",
+      "title": "Ability Id"
+    },
+    "ability_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Ability/spell name",
+      "title": "Ability Name"
+    },
+    "ability_school": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DamageSchool"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Damage/healing school (fire, frost, holy, etc.)"
+    },
+    "damage_amount": {
+      "anyOf": [
+        {
+          "maximum": 1000000.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Damage dealt (for combat_damage events)",
+      "title": "Damage Amount"
+    },
+    "healing_amount": {
+      "anyOf": [
+        {
+          "maximum": 500000.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Healing done (for heal events)",
+      "title": "Healing Amount"
+    },
+    "is_critical_hit": {
+      "default": false,
+      "description": "Was this a critical hit/heal?",
+      "title": "Is Critical Hit",
+      "type": "boolean"
+    },
+    "critical_multiplier": {
+      "default": 1.0,
+      "description": "Critical hit multiplier (1.0 = no crit, 2.0 = 2x damage)",
+      "maximum": 5.0,
+      "minimum": 1.0,
+      "title": "Critical Multiplier",
+      "type": "number"
+    },
+    "is_resisted": {
+      "default": false,
+      "title": "Is Resisted",
+      "type": "boolean"
+    },
+    "is_blocked": {
+      "default": false,
+      "title": "Is Blocked",
+      "type": "boolean"
+    },
+    "is_absorbed": {
+      "default": false,
+      "title": "Is Absorbed",
+      "type": "boolean"
+    },
+    "target_entity_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Target entity identifier",
+      "title": "Target Entity Id"
+    },
+    "target_entity_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Target entity name",
+      "title": "Target Entity Name"
+    },
+    "target_entity_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EntityType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Type of target (player, boss, add, interactive)"
+    },
+    "target_entity_health_pct_before": {
+      "anyOf": [
+        {
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Target health percentage before event",
+      "title": "Target Entity Health Pct Before"
+    },
+    "target_entity_health_pct_after": {
+      "anyOf": [
+        {
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Target health percentage after event",
+      "title": "Target Entity Health Pct After"
+    },
+    "resource_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResourceType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Type of resource (mana, energy, rage, etc.)"
+    },
+    "resource_amount_before": {
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Resource amount before event",
+      "title": "Resource Amount Before"
+    },
+    "resource_amount_after": {
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Resource amount after event",
+      "title": "Resource Amount After"
+    },
+    "resource_regeneration_rate": {
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Resource regeneration rate (units per second)",
+      "title": "Resource Regeneration Rate"
+    },
+    "ingestion_timestamp": {
+      "description": "When the event was ingested into the system",
+      "format": "date-time",
+      "title": "Ingestion Timestamp",
+      "type": "string"
+    },
+    "source_system": {
+      "default": "wow-raid-addon-v1.2",
+      "description": "System that generated this event",
+      "title": "Source System",
+      "type": "string"
+    },
+    "data_quality_flags": {
+      "description": "Data quality flags (e.g., ['late_arrival', 'missing_target'])",
+      "items": {
+        "type": "string"
+      },
+      "title": "Data Quality Flags",
+      "type": "array"
+    },
+    "server_latency_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Server latency in milliseconds",
+      "title": "Server Latency Ms"
+    },
+    "client_latency_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Client latency in milliseconds",
+      "title": "Client Latency Ms"
+    }
+  },
+  "required": [
+    "event_type",
+    "timestamp",
+    "raid_id",
+    "source_player_id",
+    "source_player_name"
+  ],
+  "title": "WoWRaidEvent",
+  "type": "object"
+}
