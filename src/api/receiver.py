@@ -1,21 +1,23 @@
 """
 Flask HTTP receiver for WoW raid telemetry events.
-Validates incoming events with Pydantic before acknowledging.
+Validates incoming events with Pydantic and persists to MinIO Bronze.
 
-Phase: 2.1 (HTTP Receiver - Basic)
+Phase: 2 (HTTP Receiver + Bronze Persistence)
 Endpoint: POST /events
 """
 
 from flask import Flask, request, jsonify
 from pydantic import ValidationError
-from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
+import uuid
 
 from src.schemas.eventos_schema import WoWRaidEvent
-
+from src.storage.minio_client import MinIOStorageClient
 
 app = Flask(__name__)
 
+# Inicializar cliente de almacenamiento (singleton para toda la app)
+storage_client = MinIOStorageClient()
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -23,17 +25,16 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "wow-telemetry-receiver",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }), 200
-
 
 @app.route('/events', methods=['POST'])
 def receive_events():
     """
-    Receive and validate WoW raid events.
+    Receive and validate WoW raid events, then persist to Bronze.
     
     Expects JSON array of events.
-    Returns 200 if all valid, 400 if any validation fails.
+    Returns 201 with batch_id if successful, 400 if validation fails.
     """
     if not request.is_json:
         return jsonify({
@@ -77,18 +78,45 @@ def receive_events():
             "errors": errors[:5]  # Return first 5 errors
         }), 400
     
-    # All events validated successfully
-    return jsonify({
-        "status": "accepted",
-        "events_received": len(validated_events),
-        "timestamp": datetime.utcnow().isoformat()
-    }), 200
-
+    # --- NUEVA LÓGICA: Persistencia en Bronze ---
+    
+    # Extraer raid_id del primer evento (asumimos que todos son de la misma raid)
+    raid_id = validated_events[0].raid_id
+    
+    # Crear el batch envelope
+    batch_id = str(uuid.uuid4())
+    ingest_timestamp = datetime.now(timezone.utc).isoformat()
+    
+    batch_data = {
+        "batch_id": batch_id,
+        "ingest_timestamp": ingest_timestamp,
+        "event_count": len(validated_events),
+        "events": [event.model_dump(mode='json') for event in validated_events]
+    }
+    
+    # Guardar en MinIO Bronze
+    try:
+        storage_result = storage_client.save_batch(raid_id, batch_data)
+        
+        return jsonify({
+            "status": "accepted",
+            "batch_id": batch_id,
+            "events_received": len(validated_events),
+            "storage": storage_result,
+            "timestamp": ingest_timestamp
+        }), 201  # 201 Created
+        
+    except Exception as e:
+        # Si falla el guardado, retornar error 500
+        return jsonify({
+            "status": "storage_error",
+            "error": str(e),
+            "events_validated": len(validated_events)
+        }), 500
 
 def create_app():
     """Application factory pattern for testing."""
     return app
-
 
 if __name__ == '__main__':
     print("=" * 70)
@@ -99,7 +127,7 @@ if __name__ == '__main__':
     print("  GET  /health  - Health check")
     print("  POST /events  - Receive events (JSON array)")
     print()
+    print("Storage: MinIO Bronze Layer")
     print("Starting server on http://localhost:5000")
     print("=" * 70)
-    
     app.run(host='0.0.0.0', port=5000, debug=True)
