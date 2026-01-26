@@ -1,21 +1,27 @@
 """
 ETL Principal: Bronze -> Silver.
 Lectura de JSON crudo -> Transformación Pandas -> Escritura Parquet particionado.
+
+Soporta dos formatos de entrada:
+1. Envelope (HTTP): {"batch_id": "...", "events": [...]}
+2. Array directo (S3): [...]
 """
 
 import sys
 import os
 import json
 import pandas as pd
+import re
 from typing import Dict, Tuple
 from datetime import datetime, timezone
-import io  # Para manejar streams de bytes
+import io
 
 # Aseguramos que Python encuentre nuestros módulos
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from src.storage.minio_client import MinIOStorageClient
 from src.etl.transformers import SilverTransformer
+
 
 class BronzeToSilverETL:
     def __init__(self):
@@ -99,23 +105,48 @@ class BronzeToSilverETL:
     def run(self, bronze_key: str) -> Dict:
         """
         Ejecuta el ciclo completo para un archivo específico.
+        Soporta dos formatos de JSON:
+        1. Envelope (HTTP): {"batch_id": "...", "events": [...]}
+        2. Array directo (S3): [...]
         """
         print(f"⚡ [ETL] Procesando: {bronze_key}")
         
         # 1. READ
         raw_data = self.read_bronze_batch(bronze_key)
         
-        # 2. TRANSFORM
-        # Extraemos la lista de eventos del JSON envelope
-        events_list = raw_data.get('events', [])
-        if not events_list:
-            return {"status": "skipped", "reason": "no_events_in_batch"}
+        # 2. NORMALIZAR FORMATO
+        # Detectar si es envelope (dict) o array directo (list)
+        if isinstance(raw_data, dict):
+            # Formato HTTP: Extraer 'events'
+            events_list = raw_data.get('events', [])
+            batch_id = raw_data.get('batch_id', 'unknown')
             
+            if not events_list:
+                return {"status": "skipped", "reason": "no_events_in_envelope"}
+        
+        elif isinstance(raw_data, list):
+            # Formato S3 directo: Ya es lista de eventos
+            events_list = raw_data
+            
+            # Generar batch_id desde el filename
+            # Ej: batch_709369ff-192f-4ee7.json → 709369ff-192f-4ee7
+            match = re.search(r'batch_([a-f0-9\-]+)\.json', bronze_key)
+            batch_id = match.group(1) if match else 'unknown'
+            
+            if not events_list:
+                return {"status": "skipped", "reason": "empty_array"}
+        
+        else:
+            return {
+                "status": "error", 
+                "reason": f"unknown_json_type: {type(raw_data)}"
+            }
+        
+        # 3. TRANSFORM
         df_raw = pd.DataFrame(events_list)
         df_silver, metadata = self.transformer.transform_pipeline(df_raw)
         
-        # 3. WRITE
-        batch_id = raw_data.get('batch_id', 'unknown')
+        # 4. WRITE
         raid_id = df_silver['raid_id'].iloc[0] if 'raid_id' in df_silver.columns else 'unknown'
         
         storage_result = self.save_silver(df_silver, raid_id, batch_id)

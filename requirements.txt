@@ -12,9 +12,13 @@ boto3>=1.40.70       # Cliente para MinIO/S3
 # --- Testing & Scripts ---
 requests>=2.32.5    # Para scripts de prueba (test_ingestion.py)
 pytest>=9.0.2       # Para tests unitarios automatizados
+tqdm>=4.67.1
 
 # --- ETL & Silver Layer (Fase 3) ---
 pandas>=2.3.3       # Procesamiento de DataFrames
 pyarrow>=22.0.0
 fsspec>=2026.1.0   # Gestión de sistemas de archivos
 s3fs>=2026.1.0     # Soporte S3 para Pandas/Fsspec
+
+# --- Agregaciones y Métricas de Negocios: Silver layer to Gold layer (Fase 4) ---
+python-duckdb>=1.4.3 
