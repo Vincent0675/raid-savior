@@ -96,3 +96,26 @@ class MinIOStorageClient:
             )
         except ClientError as e:
             raise ConnectionError(f"Error escribiendo {object_name} en {bucket_name}: {e}")
+        
+    def list_objects(self, bucket: str, prefix: str) -> list:
+        """
+        Lista objetos en un bucket con un prefijo dado.
+        
+        Args:
+            bucket: Nombre del bucket
+            prefix: Prefijo de ruta (ej. "wow_raid_events/v1/raid_id=raid001/")
+        
+        Returns:
+            Lista de keys (strings) de objetos que coinciden con el prefijo
+        """
+        try:
+            response = self.s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+            
+            if 'Contents' not in response:
+                return []
+            
+            return [obj['Key'] for obj in response['Contents']]
+        
+        except Exception as e:
+            print(f"Error listando objetos en {bucket}/{prefix}: {e}")
+            return []
