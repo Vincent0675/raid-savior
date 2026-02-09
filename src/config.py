@@ -18,6 +18,8 @@ class Config:
     S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "minio")
     S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "minio123")
     S3_BUCKET_BRONZE = os.getenv("S3_BUCKET_BRONZE", "bronze")
+    S3_BUCKET_SILVER = os.getenv("S3_BUCKET_SILVER", "silver")
+    S3_BUCKET_GOLD = os.getenv("S3_BUCKET_GOLD", "gold")
     
     # Pipeline Settings
     MAX_EVENTS_PER_BATCH = int(os.getenv("MAX_EVENTS_PER_BATCH", 1000))
