@@ -69,3 +69,6 @@ temp/
 
 # Cache cleaner Python
 clean_cache.sh
+
+# Push Dual (Repo personal / Repo académico)
+push-dual.sh
