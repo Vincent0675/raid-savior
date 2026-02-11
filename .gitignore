@@ -51,6 +51,7 @@ data/gold/*
 *.parquet
 *.json
 *.csv
+*.jsonl
 # Excepto samples pequeños
 !data/raw/sample_*.json
 

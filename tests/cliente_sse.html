@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Prueba SSE WoW</title>
+</head>
+<body>
+  <h1>Prueba SSE WoW</h1>
+  <p>Mira la consola para ver los eventos.</p>
+
+  <script>
+    const es = new EventSource("http://localhost:5000/stream/events");
+    es.onmessage = (evt) => {
+      const data = JSON.parse(evt.data);
+      console.log(
+        data.raid_id,
+        data.event_type,
+        data.damage_amount || data.healing_amount || null
+      );
+    };
+
+    es.onerror = (err) => {
+      console.error("SSE error:", err);
+    };
+  </script>
+</body>
+</html>

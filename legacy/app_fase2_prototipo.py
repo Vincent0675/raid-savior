@@ -10,8 +10,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 
 from src.config import Config
 from src.storage.minio_client import MinIOStorageClient
-# Asegúrate de que este import coincida con el nombre de tu archivo en src/schemas/
-from src.schemas.eventos_schema import WoWRaidEvent 
+from src.schemas.eventos_schema import WoWRaidEvent
+from src.api.sse_bus import sse_bus
 
 app = Flask(__name__)
 storage_client = MinIOStorageClient()
@@ -85,6 +85,7 @@ def ingest_events():
         "events": valid_events
     }
 
+
     # 4. Guardar en MinIO (Bronze Layer)
     try:
         result = storage_client.save_batch(raid_id, batch_container)
@@ -95,6 +96,34 @@ def ingest_events():
         }), 201
     except Exception as e:
         return jsonify({"error": f"Storage failure: {str(e)}"}), 500
+
+@app.route("/stream/events", methods=["GET"])
+def stream_events():
+    """
+    Endpoint SSE que emite todos los eventos validados en tiempo real.
+    """
+
+    def event_stream():
+        # Cada cliente obtiene su propia cola
+        q = sse_bus.subscribe()
+        try:
+            while True:
+                if not q:
+                    # No hay eventos pendientes: dormimos un poco para no quemar CPU
+                    time.sleep(0.1)
+                    continue
+
+                event = q.popleft()
+                # Formato SSE: data: <json>\n\n
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        finally:
+            # Limpieza cuando el cliente cierra conexión
+            sse_bus.unsubscribe(q)
+
+    return Response(
+        stream_with_context(event_stream()),
+        mimetype="text/event-stream",
+    )
 
 if __name__ == '__main__':
     # Ejecución local para desarrollo

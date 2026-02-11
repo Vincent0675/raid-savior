@@ -20,7 +20,7 @@ def generate_dummy_event():
         "source_player_name": "Tester",
         "source_player_role": "dps",    # Enum exacto
         "source_player_class": "mage",  # Enum exacto
-        "source_player_level": 70,
+        "source_player_level": 90,
         
         "target_entity_id": "target_dummy",
         "target_entity_name": "Target Dummy",
@@ -41,8 +41,8 @@ def generate_dummy_event():
 def run_test():
     # 1. Preparar Payload (Batch)
     event = generate_dummy_event()
-    payload = {"events": [event]}
-    
+    payload = [event]
+    resp = requests.post(URL, json=payload, timeout=10)
     print(f"📡 Enviando evento a {URL}...")
     # print(json.dumps(payload, indent=2)) # Descomentar para debug
     

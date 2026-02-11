@@ -4,8 +4,8 @@
 **Autor:** Byron V. Blatch Rodriguez  
 **Profesor:** Francisco Javier Ortega  
 **Repositorio:** [github.com/Vincent0675/raid-savior](https://github.com/Vincent0675/raid-savior)  
-**Estado del Proyecto:** Fase 3 de 5 completada (60%)  
-**Última Actualización:** 21 de enero de 2026
+**Estado del Proyecto:** Fase 4 de 5 completada    
+**Última Actualización:** 11 de febrero del 2026
 
 ---
 
@@ -23,11 +23,12 @@ Este proyecto demuestra competencias en:
 
 1. **Arquitectura de datos escalable**: Implementación de la arquitectura Medallion para refinamiento progresivo de datos.
 2. **Ingesta event-driven**: Receptor HTTP con validación schema-on-write usando Pydantic v2.
-3. **Almacenamiento distribuido**: MinIO (compatible S3) con particionamiento Hive-style para optimización de queries.
-4. **Transformación ETL**: Pipeline de limpieza, tipado y enriquecimiento con Pandas/PyArrow.
-5. **Formatos columnar**: Migración de JSON a Parquet con compresión Snappy (reducción 80-85%).
-6. **Testing automatizado**: Pipeline reproducible con tests de integración end-to-end.
-7. **Escalabilidad**: Diseño preparado para procesar millones de eventos mediante particionamiento inteligente.
+3. **Captura de eventos streaming**: Captura de eventos enviados al receptor HTTP con un cliente SSE en tiempo real.
+4. **Almacenamiento distribuido**: MinIO (compatible S3) con particionamiento Hive-style para optimización de queries.
+5. **Transformación ETL**: Pipeline de limpieza, tipado y enriquecimiento con Pandas/PyArrow.
+6. **Formatos columnar**: Migración de JSON a Parquet con compresión Snappy (reducción 80-85%).
+7. **Testing automatizado**: Pipeline reproducible con tests de integración end-to-end.
+8. **Escalabilidad**: Diseño preparado para procesar millones de eventos mediante particionamiento inteligente.
 
 ---
 
@@ -74,8 +75,14 @@ La arquitectura Medallion es un patrón de diseño moderno para data lakes que o
   - Joins entre dimensiones (player, encounter, ability)
 - **Granularidad:** Agregada (múltiples eventos → una métrica)
 
+Se plantean dos preguntas de negocio para establecer un objetivo tras el procesado de los datos:
+
+- ¿Qué factores determinan que una raid tenga éxito o wipee? (Éxito/Fracaso)
+- ¿Cómo detectar los estilos de "juego" de cada jugador según su rendimiento en raid?
+
 **Ejemplo de tabla Gold:**  
-`player_performance_by_raid`: DPS/HPS promedio por jugador y raid.
+`player_raid_stats`: DPS/HPS promedio por jugador y raid.
+`raid_summary`: Resumen global de la raid.
 
 ---
 
@@ -122,8 +129,6 @@ A diferencia de JSON (orientado a filas), Parquet almacena datos por columna. Es
 
 **Decisión:** Validación estricta con Pydantic en ingesta (schema-on-write).
 
-**Alternativa rechazada:** Permitir cualquier JSON y validar al leer (schema-on-read).
-
 **Justificación:**
 - Detecta errores en el momento de ingesta (feedback inmediato al cliente)
 - Evita acumulación de datos corruptos en Bronze
@@ -148,7 +153,7 @@ A diferencia de JSON (orientado a filas), Parquet almacena datos por columna. Es
 
 **Test de verificación:**
 ```bash
-python scripts/generate_dataset.py
+python scripts/genereate_massive_http.py
 ```
 
 ### Fase 2: Receptor HTTP + Ingesta Bronze (COMPLETADA)

@@ -5,7 +5,7 @@ def main():
     
     # Usar una partición que YA EXISTE en Silver (de Fase 3)
     raid_id = "raid001"
-    event_date = "2026-01-22"  # ajusta a tu fecha real
+    event_date = "2026-02-11"  # ajusta a tu fecha real
     
     result = etl.run_for_partition(raid_id, event_date)
     

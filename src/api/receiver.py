@@ -6,13 +6,16 @@ Phase: 2 (HTTP Receiver + Bronze Persistence)
 Endpoint: POST /events
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, stream_with_context
 from pydantic import ValidationError
 from datetime import datetime, timezone
 import uuid
+import json
+import time
 
 from src.schemas.eventos_schema import WoWRaidEvent
 from src.storage.minio_client import MinIOStorageClient
+from src.api.sse_bus import sse_bus
 
 app = Flask(__name__)
 
@@ -78,6 +81,12 @@ def receive_events():
             "errors": errors[:5]  # Return first 5 errors
         }), 400
     
+    # Publicar eventos validados en el bus SSE
+    for ev in validated_events:
+        ev_dict = ev.model_dump(mode="json")
+        sse_bus.publish(ev_dict)
+
+    
     # --- NUEVA LÓGICA: Persistencia en Bronze ---
     
     # Extraer raid_id del primer evento (asumimos que todos son de la misma raid)
@@ -113,6 +122,28 @@ def receive_events():
             "error": str(e),
             "events_validated": len(validated_events)
         }), 500
+
+@app.route("/stream/events", methods=["GET"])
+def stream_events():
+    def event_stream():
+        q = sse_bus.subscribe()
+        try:
+            while True:
+                if not q:
+                    time.sleep(0.1)
+                    continue
+                event = q.popleft()
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        finally:
+            sse_bus.unsubscribe(q)
+
+    resp = Response(
+        stream_with_context(event_stream()),
+        mimetype="text/event-stream",
+    )
+    # CORS abierto para desarrollo: permite cualquier origen
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
 
 def create_app():
     """Application factory pattern for testing."""
