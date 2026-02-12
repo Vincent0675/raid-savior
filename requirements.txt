@@ -1,24 +1,24 @@
-# --- Core (Fase 1 & 2) ---
-numpy>=2.2.6       # Generación de datos estadísticos
+# --- Core ---
+numpy>=2.4.2       # Generación de datos estadísticos
 pydantic>=2.12.5     # Validación de Schemas (Schema-on-Write)
 
-# --- API & Web (Fase 2) ---
+# --- API & Web ---
 flask>=3.1.2        # Receptor HTTP
 python-dotenv>=1.2.1 # Manejo de variables de entorno
 
-# --- Storage (Fase 2) ---
+# --- Storage ---
 boto3>=1.40.70       # Cliente para MinIO/S3
 
 # --- Testing & Scripts ---
-requests>=2.32.5    # Para scripts de prueba (test_ingestion.py)
+requests>=2.32.5    # Para scripts de prueba (test_ingestion_manual.py)
 pytest>=9.0.2       # Para tests unitarios automatizados
-tqdm>=4.67.1
+tqdm>=4.67.1        # Para visualización de barras de progreso en los tests
 
-# --- ETL & Silver Layer (Fase 3) ---
+# --- ETL & Silver Layer ---
 pandas>=2.3.3       # Procesamiento de DataFrames
 pyarrow>=22.0.0
 fsspec>=2026.1.0   # Gestión de sistemas de archivos
 s3fs>=2026.1.0     # Soporte S3 para Pandas/Fsspec
 
-# --- Agregaciones y Métricas de Negocios: Silver layer to Gold layer (Fase 4) ---
+# --- Agregaciones y Métricas de Negocios: Silver layer to Gold layer ---
 python-duckdb>=1.4.3 

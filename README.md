@@ -4,391 +4,369 @@
 **Autor:** Byron V. Blatch Rodriguez  
 **Profesor:** Francisco Javier Ortega  
 **Repositorio:** [github.com/Vincent0675/raid-savior](https://github.com/Vincent0675/raid-savior)  
-**Estado del Proyecto:** Fase 4 de 5 completada    
-**Última Actualización:** 11 de febrero del 2026
+**Estado del Proyecto (implementación):** Fase 3 completada, Fase 4 en desarrollo avanzado.  
+**Contexto académico (documentación):** Roadmap maestro con Fase 4 considerada operativa a nivel Gold.  
+**Última Actualización:** 12 de febrero de 2026.
 
 ---
 
-## Descripción del Proyecto
+## 1. Visión general del proyecto
 
-Pipeline de datos event-driven que simula la telemetría de raids en el videojuego World of Warcraft. El proyecto implementa una arquitectura Medallion completa (Bronze → Silver → Gold) para demostrar el dominio de herramientas modernas de Big Data, desde la ingesta de eventos en tiempo real hasta la generación de métricas analíticas de negocio.
+Este repositorio implementa un **pipeline de telemetría event-driven** que simula raids de World of Warcraft usando una arquitectura **Medallion** completa (Bronze → Silver → Gold) sobre MinIO (estructura S3), con validación estricta mediante Pydantic v2 y transformación ETL a formato Parquet columnar.  
 
-El caso de uso simula un sistema de monitorización de rendimiento de jugadores en raids de alto nivel, donde cada habilidad lanzada, daño recibido y curación aplicada genera un evento de telemetría que debe ser procesado, validado, transformado y analizado.
-
----
-
-## Objetivos de Aprendizaje
-
-Este proyecto demuestra competencias en:
-
-1. **Arquitectura de datos escalable**: Implementación de la arquitectura Medallion para refinamiento progresivo de datos.
-2. **Ingesta event-driven**: Receptor HTTP con validación schema-on-write usando Pydantic v2.
-3. **Captura de eventos streaming**: Captura de eventos enviados al receptor HTTP con un cliente SSE en tiempo real.
-4. **Almacenamiento distribuido**: MinIO (compatible S3) con particionamiento Hive-style para optimización de queries.
-5. **Transformación ETL**: Pipeline de limpieza, tipado y enriquecimiento con Pandas/PyArrow.
-6. **Formatos columnar**: Migración de JSON a Parquet con compresión Snappy (reducción 80-85%).
-7. **Testing automatizado**: Pipeline reproducible con tests de integración end-to-end.
-8. **Escalabilidad**: Diseño preparado para procesar millones de eventos mediante particionamiento inteligente.
+Cada habilidad lanzada, golpe recibido o curación realizada se modela como un **evento estructurado** que atraviesa las capas Bronze (datos crudos), Silver (datos limpios y enriquecidos) y Gold (tablas agregadas analíticas), sirviendo de base a dashboards y modelos de IA para evaluar el rendimiento de raids y jugadores.
 
 ---
 
-## Arquitectura: Medallion (Bronze → Silver → Gold)
+## 2. Objetivos de aprendizaje y contexto académico
 
-La arquitectura Medallion es un patrón de diseño moderno para data lakes que organiza los datos en tres capas de refinamiento progresivo, permitiendo escalabilidad y trazabilidad.
+El proyecto es el núcleo técnico donde convergen varias asignaturas de la especialización en Big Data e Inteligencia Artificial, todas apoyadas en la misma arquitectura Medallion.
 
-### Capa Bronze (Raw/Ingesta)
+### 2.1 Competencias técnicas clave
 
-**Responsabilidad:** Almacenamiento de datos crudos tal cual llegan desde la fuente.
+**Arquitectura de datos escalable**: Diseño e implementación de la arquitectura Medallion (Bronze / Silver / Gold) sobre object storage compatible S3 (MinIO).  
 
-- **Formato:** JSON (texto plano)
-- **Particionamiento:** `wow_raid_events/v1/raidid={raid_id}/ingest_date={YYYY-MM-DD}/`
-- **Validación:** Schema-on-write con Pydantic (rechazo de eventos inválidos en origen)
-- **Granularidad:** Evento individual
-- **Inmutabilidad:** Los datos nunca se modifican, solo se añaden (append-only)
+**Ingesta event-driven con validación fuerte**: Receptor HTTP Flask que aplica validación *schema-on-write* con Pydantic v2 antes de persistir en Bronze.  
 
-**Ventaja:** Auditoría completa. Si un error ocurre en capas superiores, siempre se puede reprocessar desde Bronze.
+**Streaming y observabilidad básica**: Generación masiva de eventos a través de HTTP y visualización en tiempo real con un cliente SSE HTML/JS.  
 
-### Capa Silver (Clean/Refinada)
+**Almacenamiento distribuido y formatos columnar**: MinIO como capa de almacenamiento distribuido y conversión de JSON a Parquet con compresión Snappy en Silver.  
 
-**Responsabilidad:** Datos limpios, tipados y enriquecidos, listos para análisis.
+**Transformación ETL profesional**: Limpieza, tipado, deduplicación, validación de rangos y enriquecimiento de eventos mediante Pandas y PyArrow.  
 
-- **Formato:** Apache Parquet (columnar + compresión Snappy)
-- **Particionamiento:** `wow_raid_events/v1/raid_id={raid_id}/event_date={YYYY-MM-DD}/`
-- **Transformaciones aplicadas:**
-  - Conversión de tipos (string → datetime64, float64, bool)
-  - Deduplicación (eliminación de eventos duplicados)
-  - Validación de rangos lógicos (ej. health 0-100%)
-  - Enriquecimiento a nivel de evento (`is_massive_hit`, `ingest_latency_ms`)
-- **Granularidad:** Evento individual (mantiene detalle máximo)
-- **Compresión:** 80-85% reducción de tamaño vs JSON
+**Capa Gold orientada a negocio y a IA**: Definición e implementación progresiva de `gold.raid_summary` y `gold.player_raid_stats` como “fuente única de verdad” para analítica y ML.  
 
-**Ventaja:** Velocidad de lectura 10-100x superior gracias a formato columnar y predicate pushdown.
+**Testing automatizado e integración end-to-end**: Suite de tests unitarios e integración (incluyendo `tests/test_pipeline_integration.py` y `tests/test_gold_pipeline.py`) que ejercitan el pipeline completo.
 
-### Capa Gold (Business/Analítica) - PLANIFICADA
+### 2.2 Integración con las asignaturas
 
-**Responsabilidad:** Métricas agregadas y datasets optimizados para dashboards.
+Según el documento de contexto maestro, el proyecto se integra así en el plan académico:
 
-- **Formato:** Parquet o tablas denormalizadas
-- **Transformaciones aplicadas:**
-  - Agregaciones (GROUP BY jugador, clase, raid, fase del boss)
-  - Métricas de negocio (DPS, HPS, rankings, percentiles)
-  - Joins entre dimensiones (player, encounter, ability)
-- **Granularidad:** Agregada (múltiples eventos → una métrica)
+##### **Big Data Aplicado (BDA)**  
+  - Implementación de capas Bronze, Silver y Gold en MinIO.  
+  - Ingesta masiva event-driven con validación *schema-on-write* y adopción de Parquet para eficiencia de coste y tiempo.  
 
-Se plantean dos preguntas de negocio para establecer un objetivo tras el procesado de los datos:
+##### **Sistemas de Big Data**  
+  - Observabilidad del pipeline y telemetría de eventos.  
+  - Uso previsto de Grafana/Kibana sobre Silver y Gold para monitorizar salud técnica y KPIs.  
+  - Infraestructura basada en contenedores Docker para servicios como MinIO y el receptor.  
 
-- ¿Qué factores determinan que una raid tenga éxito o wipee? (Éxito/Fracaso)
-- ¿Cómo detectar los estilos de "juego" de cada jugador según su rendimiento en raid?
+##### **Programación de Inteligencia Artificial**  
+  - Diseño de APIs de consumo (FastAPI planificada) para exponer métricas de Gold a otros servicios.  
+  - Dashboards ligeros con Streamlit para visualización rápida de métricas por raid y por jugador.  
+  - Uso de AutoML (PyCaret) sobre `gold.raid_summary` como base de experimentación.  
 
-**Ejemplo de tabla Gold:**  
-`player_raid_stats`: DPS/HPS promedio por jugador y raid.
-`raid_summary`: Resumen global de la raid.
+##### **Modelos de Inteligencia Artificial**  
+  - Clasificación predictiva del éxito de la raid (`raid_outcome`) usando features de Gold.  
+  - Clustering de estilos de juego a partir de `gold.player_raid_stats` (agresivo, eficiente, conservador, etc.).  
+  - Entrenamiento acelerado mediante GPU (RTX 3050 + CUDA) para modelos de mayor complejidad.  
 
 ---
 
-## Decisiones de Diseño Clave
+## 3. Arquitectura Medallion: Bronze → Silver → Gold
 
-### 1. Particionamiento Hive-Style
+La arquitectura Medallion organiza los datos en tres capas de refinamiento progresivo que mejoran calidad, estructura y utilidad analítica.
 
-El particionamiento físico de archivos siguiendo el patrón `columna=valor/` permite que motores analíticos (Spark, Athena, DuckDB) omitan la lectura de particiones irrelevantes.
+### 3.1 Capa Bronze – Raw / Ingesta
 
-**Ejemplo de optimización:**
-```
-Query: SELECT * FROM events WHERE raid_id = 'raid001' AND event_date = '2026-01-21'
+**Responsabilidad:** almacenar datos crudos tal y como llegan desde el receptor HTTP, pero ya validados por schema-on-write.
 
-Sin particionamiento:
-- Lee TODOS los archivos del bucket
-- Filtra en memoria
-- Tiempo: O(N) donde N = total de eventos
+- **Formato:** JSON (array de eventos validados).  
+- **Destino:** bucket `bronze` en MinIO.  
+- **Key pattern (contrato de escritura):**  
+  `wow_raid_events/v1/raidid={raid_id}/ingestdate={YYYY-MM-DD}/batch={uuid}.json`.  
+- **Validación:**  
+  - Pydantic v2 en el propio receptor (schema-on-write).  
+  - Rechazo con HTTP 400 ante eventos inválidos, sin permitir su escritura en Bronze.  
+- **Propiedades clave:**  
+  - Inmutabilidad (append-only).  
+  - Metadatos con `batch-id`, `event-count`, `ingest-timestamp` y `batch-source` para trazabilidad.
 
-Con particionamiento:
-- Lee SOLO la carpeta raid_id=raid001/event_date=2026-01-21/
-- Sin filtrado adicional necesario
-- Tiempo: O(M) donde M = eventos de esa partición (reducción 90-99%)
-```
+### 3.2 Capa Silver – Clean / Refinada
 
-**Particiones implementadas:**
-- `raid_id`: Separa raids independientes (paralelización por raid)
-- `event_date`: Permite queries temporales eficientes (ej. "últimos 7 días")
+**Responsabilidad:** ofrecer eventos limpios, tipados y enriquecidos, listos para uso analítico masivo.
 
-**Escalabilidad:** Con 100 raids y datos de 365 días, se generan 36,500 particiones independientes, permitiendo lectura masivamente paralela.
+- **Formato:** Apache Parquet + compresión Snappy.  
+- **Destino:** bucket `silver` en MinIO.  
+- **Particionamiento lógico:**  
+  `wow_raid_events/v1/raidid={raid_id}/eventdate={YYYY-MM-DD}/...`.  
 
-### 2. Formato Parquet Columnar
+**Transformaciones principales (módulo `SilverTransformer`):**
 
-A diferencia de JSON (orientado a filas), Parquet almacena datos por columna. Esto permite:
+1. **Cast de tipos**  
+   - `timestamp`, `ingest_timestamp`: string ISO 8601 → `datetime64[ns, UTC]`.  
+   - Numéricos (`damage_amount`, `healing_amount`, health_pct, resources) → `float64`.  
 
-- **Compresión extrema:** Columnas con valores repetidos (ej. `raid_id`, `event_type`) se comprimen con Dictionary Encoding (reducción 90-95%)
-- **Lectura selectiva:** Una query que necesita solo 3 columnas de 50 totales lee solo esas 3 columnas del disco
-- **Pushdown de predicados:** Metadatos (min/max por bloque) permiten saltar bloques que no cumplen filtros
+2. **Deduplicación**  
+   - Eliminación de duplicados por `event_id`.  
+   - Conteo de duplicados eliminados en metadata.  
 
-**Benchmark interno (10 eventos):**
-- JSON crudo: 100-150 KB
-- Parquet + Snappy: 20-25 KB (reducción 80-83%)
+3. **Validación de rangos**  
+   - `health_pct` en rango [0, 100].  
+   - Daños y curaciones no negativos.  
 
-### 3. Schema-on-Write vs Schema-on-Read
+4. **Enriquecimiento**  
+   - `ingest_latency_ms`: diferencia temporal entre `timestamp` e `ingest_timestamp`.  
+   - `is_massive_hit`: flag para golpes de daño mayor a un umbral (ej. 10.000).  
+   - `event_date`: fecha derivada para particionamiento y reporting.  
 
-**Decisión:** Validación estricta con Pydantic en ingesta (schema-on-write).
+### 3.3 Capa Gold – Business / Analítica
 
-**Justificación:**
-- Detecta errores en el momento de ingesta (feedback inmediato al cliente)
-- Evita acumulación de datos corruptos en Bronze
-- Garantiza tipado fuerte en todo el pipeline
+**Responsabilidad:** proporcionar tablas analíticas agregadas que sirvan de base a decisiones y modelos de IA.
 
----
+Tablas Gold definidas en el documento maestro:
 
-## Estado Actual del Proyecto
+1. **`gold.raid_summary` (macroscópica)**  
+   - 1 fila por raid/encuentro.  
+   - Incluye KPIs globales: duración, daño total, curación total, muertes, etc.  
+  - Campo `raid_outcome` (Success/Wipe) calculado según reglas de negocio sobre vida del boss y muertes permitidas.  
 
-### Fase 1: Generación de Datos Sintéticos (COMPLETADA)
+2. **`gold.player_raid_stats` (microscópica)**  
+   - 1 fila por jugador y raid.  
+   - KPIs: DPS, HPS, ratio de críticos, share de daño, muertes, entre otros.  
 
-**Objetivo:** Crear eventos de telemetría realistas con distribuciones estadísticas.
+Gold es el punto de partida para:
 
-**Componentes:**
-- `src/schemas/eventos_schema.py`: Modelo Pydantic con 6 tipos de eventos (combat_damage, heal, player_death, spell_cast, boss_phase, mana_regeneration)
-- `src/generators/raid_event_generator.py`: Generador con distribuciones NumPy (Normal para daño, Bernoulli para críticos)
-
-**Características:**
-- Eventos con timestamps ordenados temporalmente
-- Distribución realista de roles (8% tank, 20% healer, 72% dps)
-- Validación estricta (ej. `raid_id` debe cumplir patrón `^raid\d{3}$`)
-
-**Test de verificación:**
-```bash
-python scripts/genereate_massive_http.py
-```
-
-### Fase 2: Receptor HTTP + Ingesta Bronze (COMPLETADA)
-
-**Objetivo:** API HTTP que recibe eventos, valida y persiste en MinIO (capa Bronze).
-
-**Componentes:**
-- `src/api/receiver.py`: API Flask con endpoint POST `/events`
-- `src/storage/minio_client.py`: Cliente wrapper para MinIO/S3
-- `infra/minio/docker-compose.yml`: Infraestructura de almacenamiento
-
-**Flujo de ingesta:**
-1. Cliente envía array JSON de eventos → `POST /events`
-2. Validación con Pydantic (rechazo con 400 si falla)
-3. Generación de `batch_id` (UUID único)
-4. Persistencia en `s3://bronze/wow_raid_events/v1/raidid=X/ingest_date=Y/batch_{uuid}.json`
-5. Respuesta 201 con `batch_id`
-
-**Test de verificación:**
-```bash
-# Terminal 1: Levantar receptor
-python src/api/receiver.py
-
-# Terminal 2: Enviar eventos
-curl -X POST http://localhost:5000/events   -H "Content-Type: application/json"   -d @data/eventos_ejemplo.json
-```
-
-### Fase 3: Transformación ETL Bronze → Silver (COMPLETADA)
-
-**Objetivo:** Pipeline ETL que transforma JSON crudo a Parquet optimizado.
-
-**Componentes:**
-- `src/etl/transformers.py`: Lógica de limpieza, tipado y enriquecimiento
-- `src/etl/bronze_to_silver.py`: Orquestador ETL (lectura → transformación → escritura)
-
-**Transformaciones aplicadas:**
-
-1. **Limpieza:**
-   - Eliminación de duplicados exactos (columna `event_id`)
-   - Filtrado de valores inválidos (ej. `health_pct` fuera de rango 0-100)
-
-2. **Conversión de tipos:**
-   - `timestamp`: string ISO 8601 → datetime64[ns, UTC]
-   - `damage_amount`, `healing_amount`: string/int → float64
-   - `is_critical_hit`: string → bool
-
-3. **Enriquecimiento:**
-   - `ingest_latency_ms`: Diferencia temporal entre evento y su ingesta
-   - `is_massive_hit`: Flag booleano para daño > 10,000
-   - `event_date`: Fecha extraída del timestamp para particionamiento
-
-**Test de verificación:**
-```bash
-python scripts/test_pipeline_integration.py
-```
-
-**Resultado esperado:** Mensaje "TEST COMPLETO: TODOS LOS PASOS EXITOSOS" con métricas de compresión.
+- Dashboards live (Streamlit / Chart.js / Grafana / Kibana).  
+- Modelos de clasificación (éxito de raid) y clustering (perfiles de jugador).  
+- Análisis de rendimiento individual y de composición de raid.
 
 ---
 
-## Fases Planificadas
+## 4. Flujo práctico: ejecutar el pipeline end-to-end
 
-### Fase 4: Capa Gold - Agregaciones y Métricas de Negocio (PLANIFICADA)
+A continuación se describe el flujo que puedes ejecutar hoy para recorrer el pipeline desde Bronze hasta Silver y ejercer la lógica de Gold a través de tests.
 
-**Objetivo:** Calcular métricas agregadas de rendimiento y rankings.
+### Paso 1 – Levantar MinIO
 
-**Componentes a desarrollar:**
-- `src/analytics/aggregators.py`: Funciones de agregación (DPS, HPS, rankings)
-- `src/analytics/gold_layer.py`: Orquestador de cálculos Gold
-
-**Métricas planificadas:**
-
-1. **DPS (Damage Per Second) por Jugador:**
-   - Fórmula: `SUM(damage_amount) / (encounter_duration_ms / 1000)`
-   - Agrupado por: `player_name`, `player_class`, `raid_id`
-   - Output: `gold/player_dps/raid_id={X}/player_dps.parquet`
-
-2. **HPS (Healing Per Second) por Healer:**
-   - Similar a DPS pero filtrando `event_type = 'heal'`
-
-3. **Timeline de Encounter:**
-   - Daño y curación acumulados segundo a segundo
-   - Agrupado por: `timestamp` redondeado a 1s, `raid_id`
-   - Output: `gold/encounter_timeline/raid_id={X}/timeline.parquet`
-
-4. **Rankings:**
-   - Top 10 jugadores por DPS/HPS
-   - Percentiles de rendimiento (P50, P90, P99)
-
-5. **Detección de Anomalías:**
-   - Jugadores con DPS estadísticamente improbable (>3 desviaciones estándar)
-   - Uso para detección de trampas
-
-**Tecnologías:**
-- Pandas para agregaciones en memoria (datasets pequeños)
-- Transición a DuckDB si el volumen crece (procesamiento analítico eficiente)
-
-### Fase 5: Visualización y Machine Learning (PLANIFICADA)
-
-**Objetivo:** Dashboard interactivo y modelos predictivos.
-
-**Componentes a desarrollar:**
-
-1. **Dashboard Interactivo:**
-   - Tecnología: Streamlit o Plotly Dash
-   - Gráficas:
-     - Línea temporal: Daño vs Curación a lo largo del encuentro
-     - Barras: Top 10 DPS por clase
-     - Heatmap: Muertes de jugadores por fase del boss
-     - Scatter: Correlación entre críticos y DPS total
-
-2. **Modelos Predictivos:**
-   - **Clasificación:** Predecir si una raid tendrá éxito basándose en métricas de los primeros 60 segundos
-   - **Regresión:** Estimar tiempo de kill del boss según composición de raid
-   - **Clustering:** Agrupar jugadores por estilo de juego (agresivo, conservador, eficiente)
-
-**Tecnologías:**
-- scikit-learn para modelos baseline
-- XGBoost para modelos avanzados
-- PyTorch si se requiere deep learning (ej. LSTM para secuencias temporales)
-
-**Optimización GPU:**
-- Uso de NVIDIA RTX 3050 (4GB VRAM) para entrenamiento acelerado
-- CUDA 12.x para operaciones tensoriales
-
----
-
-## Reproducción del Proyecto
-
-### Requisitos de Hardware
-
-**Configuración de desarrollo:**
-- **Portátil:** ASUS TUF Gaming A15
-- **GPU:** NVIDIA RTX 3050 Laptop (4GB VRAM, soporte CUDA)
-- **Sistema Operativo:** GNU/Linux, Pop OS! 22.04
-- **RAM:** 16 GB recomendados (mínimo 8 GB)
-- **Almacenamiento:** 10 GB libres (datasets + contenedores Docker)
-
-### Requisitos de Software
-
-**Versiones exactas utilizadas:**
-- Python: 3.10.19
-- Mamba: 2.3.3
-- Docker: 20.10+ (para MinIO)
-- Git: 2.34+
-
-### Instalación y Configuración
-
-#### 1. Clonar el Repositorio
-
-```bash
-git clone https://github.com/Vincent0675/raid-savior.git
-cd raid-savior
-```
-
-#### 4. Levantar Infraestructura (MinIO)
+Desde la carpeta `infra/minio`:
 
 ```bash
 cd infra/minio
 docker compose up -d
 ```
 
-**Verificar que MinIO está corriendo:**
-```bash
-docker ps | grep minio
-```
+- **Consola web:** `http://localhost:9001`  
+- **Credenciales por defecto (ejemplo local):** usuario `minio`, contraseña `minio123`.   
+- Verifica que existen los buckets `bronze` y `silver` (y opcionalmente `gold`) en MinIO.
 
-**Acceder a la consola web:**
-- URL: http://localhost:9001
-- Credenciales: `minio` / `minio123`
+### Paso 2 – Levantar el receptor Flask
 
-#### 5. Crear Buckets en MinIO
+Desde la raíz del repositorio:
 
-Desde la consola web (http://localhost:9001):
-1. Crear bucket `bronze`
-2. Crear bucket `silver`
-
-#### 6. Configurar Variables de Env
-
-Crear archivo `.env` en la raíz del proyecto:
-
-```ini
-# Configuración MinIO
-S3_ENDPOINT_URL=http://localhost:9000
-S3_ACCESS_KEY=minio
-S3_SECRET_KEY=minio123
-
-# Buckets
-S3_BUCKET_BRONZE=bronze
-S3_BUCKET_SILVER=silver
-```
-
-#### 7. Ejecutar Test de Integración
-
-**Terminal 1 - Levantar receptor HTTP:**
 ```bash
 python src/api/receiver.py
 ```
 
-**Terminal 2 - Ejecutar test end-to-end:**
+- Expone un endpoint `POST /events` que valida eventos con Pydantic v2 y persiste batches válidos en Bronze siguiendo el contrato de escritura.  
+
+### Paso 3 – Abrir el cliente SSE
+
+Abre en el navegador:
+
+- El archivo `tests/cliente_sse.html`.
+
+Este cliente se conecta al endpoint SSE configurado dentro del HTML y muestra en la consola de JS el flujo de eventos en tiempo real.
+
+### Paso 4 – Lanzar el generador masivo de eventos HTTP
+
+En otra terminal, desde la raíz del repositorio:
+
 ```bash
-python scripts/test_pipeline_integration.py
+python src/generators/generate_massive_http.py \
+  --num-raids 5 \
+  --num-events-per-raid 50 \
+  --batch-size 25 \
+  --output-mode http
 ```
 
+- Genera eventos sintéticos distribuidos en varias raids, aplicando distribuciones realistas (Normal para daño, Bernoulli para críticos) definidas en la lógica de Fase 1.  
+- Envía micro-batches al receptor Flask via HTTP, que los valida y guarda en Bronze.
+
+### Paso 5 – Observar el streaming SSE y Bronze
+
+- En el navegador, abre la consola de JS del cliente SSE y verifica que los eventos se reciben y muestran sin errores.  
+- En la terminal del receptor Flask se verán logs de `POST /events`.  
+- En MinIO, inspecciona el bucket `bronze` para ver los nuevos objetos JSON creados según el patrón de key.
+
+### Paso 6 – Ejecutar ETL Bronze → Silver
+
+Una vez confirmada la existencia de datos en Bronze, lanza el ETL:
+
+```bash
+python src/etl/run_bronze_to_silver.py
+```
+
+- Lee batches de Bronze vía cliente MinIO.  
+- Aplica las transformaciones definidas en `SilverTransformer`.  
+- Escribe los resultados en formato Parquet comprimido en el bucket `silver` siguiendo el layout de Silver.
+
+### Paso 7 – Inspeccionar Bronze vs Silver
+
+Para comparar una muestra de ambos buckets:
+
+```bash
+python src/etl/inspect_bronze_vs_silver.py
+```
+
+- Analiza diferencias de tamaño, número de filas y estructura entre JSON (Bronze) y Parquet (Silver).  
+- Nota: con volúmenes pequeños, es posible que Parquet parezca más pesado debido al overhead inicial; el diseño está pensado para ganar de forma clara a mayor escala.
+
+### Paso 8 – Ejercer la lógica Gold mediante tests
+
+Actualmente, la transformación hacia Gold se verifica y recorre principalmente a través de la suite de tests:
+
+```bash
+pytest tests/test_gold_pipeline.py -q
+```
+
+- Este test utiliza la lógica de `src/analytics/gold_layers.py` y `src/analytics/aggregators.py` para construir y validar las tablas Gold a partir de Silver.  
+- Parte de esta capa está marcada explícitamente como **pendiente de revisión y consolidación**, pero ya cubre el flujo conceptual hacia `gold.raid_summary` y `gold.player_raid_stats`.
+
 ---
 
-## Stack Tecnológico
+## 5. Estado por fases y roadmap
+
+### 5.1 Fases implementadas (pipeline técnico)
+
+- **Fase 1 – Schema y Generador Sintético (COMPLETADA)**  
+  - Definición del schema de eventos en JSON Schema y modelos Pydantic v2 para WoW raid events.  
+  - Generación de eventos sintéticos con distribuciones realistas y validación centralizada.  
+
+- **Fase 2 – Receptor HTTP + Ingesta Bronze (COMPLETADA)**  
+  - Servidor Flask con endpoint `/events`, validación Pydantic y escritura en MinIO Bronze siguiendo un contrato de escritura determinista.  
+
+- **Fase 3 – ETL Bronze → Silver (COMPLETADA A NIVEL FUNCIONAL)**  
+  - Módulo `src/etl` con `SilverTransformer` y `BronzeToSilverETL` implementando limpieza, tipado, enriquecimiento y escritura a Parquet.  
+  - Scripts y tests de integración que verifican la presencia de archivos `.parquet` en Silver.  
+
+- **Fase 4 – Gold / Analytics (EN DESARROLLO AVANZADO)**  
+  - Documento maestro define tablas `gold.raid_summary` y `gold.player_raid_stats` y su lógica de negocio.  
+  - Implementaciones iniciales en `src/analytics/` más tests como `tests/test_gold_pipeline.py` en ejecución, con partes marcadas como “pendientes de revisión”.
+
+### 5.2 Roadmap de continuación (vista académica)
+
+
+- **Fase A – Escalabilidad y Volumen**  
+  - Generación de millones de eventos mediante un `WoWEventGenerator` optimizado por batches.  
+  - Refinar streaming SSE para dashboards en tiempo real.  
+
+- **Fase B – Interfaz y APIs**  
+  - Dashboard live (Streamlit / Chart.js) mostrando métricas en tiempo real.  
+  - API robusta (FastAPI) para consulta de históricos en Gold.  
+
+- **Fase C – Modelado de IA**  
+  - Preparación de datasets de entrenamiento a partir de Gold.  
+  - Pipeline de ML (entrenamiento, validación, exportación de modelos de clasificación y clustering).  
+
+- **Fase D – Realidad y Externalización**  
+  - Integración con Warcraft Logs API para validar el pipeline con datos reales de jugadores.
+
+---
+
+## 6. Stack tecnológico
 
 ### Core
-- **Python 3.10:** Lenguaje principal
-- **Pydantic v2:** Validación de schemas con tipado estricto
-- **NumPy:** Generación de distribuciones estadísticas (Normal, Bernoulli)
 
-### API y Web
-- **Flask 3.1:** Framework HTTP ligero para receptor de eventos
-- **python-dotenv:** Gestión de configuración mediante variables de entorno
+- **Python 3.10** – Lenguaje principal del proyecto.   
+- **Pydantic v2** – Validación estricta de schemas y generación de JSON Schema.   
+- **NumPy** – Generación de distribuciones estadísticas (Normal, Bernoulli) para eventos sintéticos.   
+
+### API e ingesta
+
+- **Flask 3.x** – Framework HTTP para el receptor de eventos.   
+- **python-dotenv** – Gestión de configuración a través de variables de entorno.  
 
 ### Almacenamiento
-- **MinIO:** Object storage compatible S3 (desarrollo local)
-- **boto3:** Cliente Python para S3/MinIO
-- **Apache Parquet:** Formato columnar con compresión Snappy
 
-### Procesamiento de Datos
-- **Pandas 2.3:** Manipulación de DataFrames
-- **PyArrow 22.0:** Motor nativo para lectura/escritura de Parquet
-- **fsspec/s3fs:** Sistemas de archivos abstractos para Pandas
+- **MinIO** – Object storage compatible S3 para capas Bronze/Silver/Gold.   
+- **boto3** – Cliente S3/MinIO para Python.  
+- **Apache Parquet + Snappy** – Formato columnar comprimido para Silver y Gold.   
+
+### Procesamiento de datos
+
+- **Pandas 2.x** – Manipulación de DataFrames y agregaciones.  
+- **PyArrow** – Motor Parquet y soporte columnar en Python.   
+
+### Testing y herramientas
+
+- **pytest** – Framework de testing para unitarios e integración.  
+- **Docker** – Orquestación de MinIO y otros servicios de infraestructura.   
 
 ---
 
-## Autor
+## 7. Reproducción del entorno
 
-**Byron V. Blatch Rodriguez**  
-Estudiante de Big Data e Inteligencia Artificial en IES Rafael Alberti, Cádiz.
-GitHub: [@Vincent0675](https://github.com/Vincent0675)
+### 7.1 Requisitos de hardware (entorno de desarrollo)
+
+- Portátil ASUS TUF Gaming A15.  
+- GPU Nvidia RTX 3050 Laptop (4GB VRAM, soporte CUDA).  
+- GNU/Linux Pop!_OS 22.04.  
+- Memoria recomendada: 8–16 GB.  
+- Espacio en disco sugerido: ~10 GB (datasets + contenedores Docker).
+
+### 7.2 Pasos básicos de instalación
+
+1. **Clonar el repositorio**
+
+```bash
+git clone https://github.com/Vincent0675/raid-savior.git
+cd raid-savior
+```
+
+2. **Crear entorno e instalar dependencias**
+
+```bash
+mamba create -n wow-telemetry python=3.10
+mamba activate wow-telemetry
+pip install -r requirements.txt
+```
+
+3. **Configurar `.env` (ejemplo mínimo)**
+
+```ini
+S3_ENDPOINT_URL=http://localhost:9000
+S3_ACCESS_KEY=minio
+S3_SECRET_KEY=minio123
+
+S3_BUCKET_BRONZE=bronze
+S3_BUCKET_SILVER=silver
+S3_BUCKET_GOLD=gold
+
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5000
+```
+
+4. **Levantar MinIO**
+
+```bash
+cd infra/minio
+docker compose up -d
+```
+
+5. **Crear buckets en MinIO**
+
+Desde `http://localhost:9001`:
+
+- Crear `bronze`, `silver` y opcionalmente `gold` con usuario `minio` y contraseña `minio123`.
+
+6. **Ejecutar el flujo descrito en la sección 4**
+
+- Levantar `src/api/receiver.py`.  
+- Abrir `tests/cliente_sse.html`.  
+- Ejecutar `src/generators/generate_massive_http.py`.  
+- Correr `src/etl/run_bronze_to_silver.py` y `src/etl/inspect_bronze_vs_silver.py`.  
+- Ejecutar `pytest tests/test_gold_pipeline.py -q` para ejercitar Gold.
+
+---
+
+## 8. Autoría
+
+**Autor:** Byron V. Blatch Rodriguez  
+Estudiante de Big Data e Inteligencia Artificial.  
+GitHub: [@Vincent0675](https://github.com/Vincent0675)  
 
 **Profesor:** Francisco Javier Ortega  
-**Fecha de Inicio:** Diciembre 2025  
-**Estado:** Fase 3 de 5 completada
+
+Este README consolidado combina el estado real de la implementación en el repositorio con el contexto académico del documento maestro y la guía práctica para ejecutar el pipeline end-to-end desde Bronze hasta las primeras capas de Gold.
+```
