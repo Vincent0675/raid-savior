@@ -71,7 +71,7 @@ class DimPlayerSchema(BaseModel):
     Estrategia de actualización: Type 1 SCD
         (se sobreescribe last_seen_date y total_raids en cada proceso).
     """
-
+    
     player_id: str = Field(
         min_length=1,
         description="Identificador único del jugador (coincide con source_player_id de Silver)",

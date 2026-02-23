@@ -232,6 +232,53 @@ class GoldLayerETL:
 
         logger.debug("[dim_player] %d jugadores únicos.", len(dim))
         return dim
+    
+    def _upsert_dim_player(
+        self,
+        new_dim: pd.DataFrame,
+        existing_dim: pd.DataFrame,
+    ) -> pd.DataFrame:
+
+        merged = existing_dim.merge(
+            new_dim,
+            on="player_id",
+            how="outer",
+            suffixes=("_existing", "_new"),
+        )
+
+        for col in ("player_name", "player_class", "player_role"):
+            merged[col] = merged[f"{col}_existing"].combine_first(merged[f"{col}_new"])
+            merged.drop(columns=[f"{col}_existing", f"{col}_new"], inplace=True)
+
+        for date_col in ("first_seen_date", "last_seen_date"):
+            for suffix in ("_existing", "_new"):
+                merged[f"{date_col}{suffix}"] = pd.to_datetime(
+                    merged[f"{date_col}{suffix}"], errors="coerce"
+                )
+
+        merged["first_seen_date"] = merged[
+            ["first_seen_date_existing", "first_seen_date_new"]
+        ].min(axis=1)
+        merged.drop(columns=["first_seen_date_existing", "first_seen_date_new"], inplace=True)
+
+        merged["last_seen_date"] = merged[
+            ["last_seen_date_existing", "last_seen_date_new"]
+        ].max(axis=1)
+        merged.drop(columns=["last_seen_date_existing", "last_seen_date_new"], inplace=True)
+
+        merged["total_raids"] = (
+            merged["total_raids_existing"].fillna(0)
+            + merged["total_raids_new"].fillna(0)
+        ).astype(int)
+        merged.drop(columns=["total_raids_existing", "total_raids_new"], inplace=True)
+
+        logger.debug(
+            "[dim_player] Upsert completado: %d jugadores en dim_player consolidada.",
+            len(merged),
+        )
+        return merged.reset_index(drop=True)
+
+
 
     def _build_dim_raid(
         self,
@@ -316,6 +363,18 @@ class GoldLayerETL:
         ------
         ValueError si alguna tabla no pasa la validación de schema.
         """
+        # Al inicio de write_gold_tables(), antes de validar:
+        try:
+            response = self.storage.s3.get_object(
+                Bucket=self.gold_bucket,
+                Key=_PATH_TEMPLATES["dim_player"].format(player_id="all"),
+            )
+            existing_dim = pd.read_parquet(io.BytesIO(response["Body"].read()))
+            logger.info("[dim_player] Existente encontrado: %d jugadores → aplicando upsert.", len(existing_dim))
+            dim_player = self._upsert_dim_player(dim_player, existing_dim)
+        except self.storage.s3.exceptions.NoSuchKey:
+            logger.info("[dim_player] Primera escritura — no hay existente previo.")
+            
         raid_id    = str(fact_raid_summary["raid_id"].iloc[0])
         event_date = str(fact_raid_summary["event_date"].iloc[0])
 
@@ -405,6 +464,9 @@ class GoldLayerETL:
                 "target_entity_health_pct_after":"targetentityhealthpctafter",
                 "is_critical_hit":               "iscriticalhit",
             })
+
+            df_silver = df_silver[df_silver["sourceplayerid"].str.startswith("player_")].copy()
+            logger.info("[Gold ETL] Eventos de jugadores reales tras filtro: %d", len(df_silver))
 
             # Añadir columnas de partición como contexto explícito
             df_silver["raidid"]    = raid_id
