@@ -26,17 +26,42 @@ from src.schemas.eventos_schema import (
     DamageSchool, EntityType, ResourceType
 )
 
+from src.generators.class_profiles import SPEC_PROFILES
+from src.generators.class_profiles import SPECS_BY_ROLE, RAID_ROLE_WEIGHTS
+from src.schemas.eventos_schema import ResourceType
+
 
 @dataclass(frozen=True)
 class Player:
+    # Campos que SÍ se pasan al constructor
     player_id: str
     name: str
-    role: str  # Mantenemos como string para compatibilidad con NumPy
-    player_class: str
+    player_class: str   # e.g. "mage"
+    spec: str           # e.g. "fire"  ← NUEVO campo principal
     level: int = 90
-    current_health_pct: float = field(default=100.0)
-    current_mana_pct: float = field(default=100.0)
+    # Campos derivados — init=False significa que NO se pasan al constructor
+    # Los calcula __post_init__ consultando SPEC_PROFILES
+    role: str          = field(default="",    init=False)
+    dps_type: str|None = field(default=None,  init=False)
+    resource_type: str = field(default="",    init=False)
 
+    def __post_init__(self) -> None:
+        """Deriva role, dps_type y resource_type de SPEC_PROFILES."""
+        spec_key = (self.player_class, self.spec)
+
+        # Validación defensiva: si la spec no existe, falla rápido (fail-fast)
+        if spec_key not in SPEC_PROFILES:
+            raise ValueError(
+                f"Spec desconocida: {spec_key}. "
+                f"Claves válidas: {list(SPEC_PROFILES.keys())[:5]}..."
+            )
+
+        profile = SPEC_PROFILES[spec_key]
+
+        # object.__setattr__ porque frozen=True no permite self.campo = valor
+        object.__setattr__(self, "role",          profile["role"])
+        object.__setattr__(self, "dps_type",      profile["dps_type"])
+        object.__setattr__(self, "resource_type", profile["resource_type"])
 
 @dataclass
 class BossPhase:
@@ -72,34 +97,12 @@ class WoWEventGenerator:
         self._py_rng = random.Random(seed)
 
         # Catálogo de habilidades
-        self._damage_abilities = [
-            {"ability_id": "spell001", "ability_name": "Fireball", "ability_school": "fire"},
-            {"ability_id": "spell002", "ability_name": "Pyroblast", "ability_school": "fire"},
-            {"ability_id": "spell003", "ability_name": "Frostbolt", "ability_school": "frost"},
-            {"ability_id": "spell004", "ability_name": "Shadowbolt", "ability_school": "shadow"},
-            {"ability_id": "spell005", "ability_name": "Arcane Missiles", "ability_school": "arcane"},
-            {"ability_id": "spell006", "ability_name": "Mortal Strike", "ability_school": "physical"},
-        ]
-        
-        self._heal_abilities = [
-            {"ability_id": "spell101", "ability_name": "Healing Touch", "ability_school": "holy"},
-            {"ability_id": "spell102", "ability_name": "Flash Heal", "ability_school": "holy"},
-            {"ability_id": "spell103", "ability_name": "Renew", "ability_school": "holy"},
-            {"ability_id": "spell104", "ability_name": "Prayer of Healing", "ability_school": "holy"},
-        ]
-        
+
         self._boss_abilities = [
             {"ability_id": "boss001", "ability_name": "Lava Burst", "ability_school": "fire"},
             {"ability_id": "boss002", "ability_name": "Shadow Strike", "ability_school": "shadow"},
             {"ability_id": "boss003", "ability_name": "AOE Flame Wave", "ability_school": "fire"},
         ]
-
-        # Clases por rol (strings para compatibilidad NumPy)
-        self._classes_by_role = {
-            "tank": ["warrior", "paladin", "death_knight"],
-            "healer": ["priest", "paladin", "druid", "monk"],
-            "dps": ["mage", "warlock", "hunter", "rogue", "shaman"],
-        }
 
     def generate_raid_session(
         self,
@@ -117,28 +120,30 @@ class WoWEventGenerator:
         
         end_time = start_time + timedelta(seconds=duration_s)
         
-        # Generar jugadores
-        players: List[Player] = []
-        role_probs = [0.08, 0.20, 0.72]  # tank, healer, dps
-        role_names = ["tank", "healer", "dps"]
-        
+        players: List[Player] = [] 
+
+        role_names   = list(RAID_ROLE_WEIGHTS.keys())    # ["tank", "healer", "dps"]
+        role_weights = list(RAID_ROLE_WEIGHTS.values())  # [0.10,   0.20,     0.70]
+
         for i in range(num_players):
-            # NumPy choice con strings (no Enums)
-            role = str(self._rng.choice(role_names, p=role_probs))
-            pclass = self._py_rng.choice(self._classes_by_role[role])
-            name = f"Player_{i:02d}"
-            player_id = f"player_{uuid.uuid4().hex[:8]}"
-            
+            # Paso 1: samplear rol
+            role = str(self._rng.choice(role_names, p=role_weights))
+
+            # Paso 2: samplear spec dentro de ese rol
+            # SPECS_BY_ROLE["dps"] es una lista de tuplas: [("mage","fire"), ("rogue","combat"), ...]
+            available_specs = SPECS_BY_ROLE[role]
+            spec_index = self._py_rng.randrange(len(available_specs))
+            player_class, spec_name = available_specs[spec_index]
+
+            # Paso 3: construir Player — role/dps_type/resource_type se derivan en __post_init__
             players.append(Player(
-                player_id=player_id,
-                name=name,
-                role=role,
-                player_class=pclass,
+                player_id=f"player_{uuid.uuid4().hex[:8]}",
+                name=f"Player_{i:02d}",
+                player_class=player_class,
+                spec=spec_name,
                 level=90,
-                current_health_pct=100.0,
-                current_mana_pct=100.0 if role in ["healer", "dps"] else 0.0,
             ))
-        
+            
         # Generar fases del boss (3 fases típicas)
         phases = [
             BossPhase(
@@ -239,29 +244,33 @@ class WoWEventGenerator:
             # Generar eventos mixtos
             for ts in timestamps:
                 timestamp = datetime.fromtimestamp(float(ts), tz=timezone.utc)
+
+                # 1. Elegir jugador primero
+                player = self._pick_player(session)
+
+                # 2. Obtener pesos de su spec
+                weights = SPEC_PROFILES[(player.player_class, player.spec)]["event_weights"]
+                event_types = list(weights.keys())
+                event_probs = list(weights.values())
+
+                # 3. Samplear event_type según el perfil del jugador
+                etype = str(self._rng.choice(event_types, p=event_probs))
+
                 
-                # Seleccionar tipo por probabilidad
-                event_type_rand = self._rng.random()
-                cumulative_prob = 0.0
-                
-                for etype, prob in event_distribution.items():
-                    cumulative_prob += prob
-                    if event_type_rand <= cumulative_prob:
-                        if etype == "damage":
-                            ev = self._create_damage_event(session, timestamp, phase)
-                        elif etype == "heal":
-                            ev = self._create_heal_event(session, timestamp, phase)
-                        elif etype == "spell_cast":
-                            ev = self._create_spell_cast_event(session, timestamp, phase)
-                        elif etype == "mana_regen":
-                            ev = self._create_mana_regen_event(session, timestamp)
-                        elif etype == "player_death":
-                            ev = self._create_player_death_event(session, timestamp, phase)
-                        else:
-                            continue
-                        
-                        events.append(ev)
-                        break
+                # 4. Dispatch — nota: "combat_damage" no "damage"
+                if etype == "combat_damage":
+                    ev = self._create_damage_event(player, session, timestamp, phase)
+                elif etype == "heal":
+                    ev = self._create_heal_event(player, session, timestamp, phase)
+                elif etype == "spell_cast":
+                    ev = self._create_spell_cast_event(player, session, timestamp, phase)
+                elif etype == "mana_regen":
+                    ev = self._create_mana_regen_event(player, session, timestamp)
+                elif etype == "player_death":
+                    ev = self._create_player_death_event(player, session, timestamp, phase)
+                else:
+                    continue
+                events.append(ev)
             
             cumulative_time += phase.duration_s
         
@@ -322,18 +331,41 @@ class WoWEventGenerator:
         """Genera latencia con distribución normal."""
         v = float(self._rng.normal(loc=mean, scale=std))
         return int(max(0.0, v))
+    
+    def _get_ability(self, player: Player, ability_type: str) -> dict:
+        """
+        Devuelve una ability aleatoria del catálogo de la spec del jugador.
+        
+        Args:
+            player: El jugador que ejecuta la ability
+            ability_type: "damage" o "heal"
+        
+        Returns:
+            dict con ability_id, ability_name, ability_school
+        """
+        spec_key = (player.player_class, player.spec)
+        abilities = SPEC_PROFILES[spec_key]["abilities"][ability_type]
+        
+        # Fallback: si la lista está vacía (ej. un healer pidiendo damage abilities
+        # y no tiene ninguna), devolvemos una ability genérica
+        if not abilities:
+            return {"ability_id": "generic_001", "ability_name": "Auto Attack", "ability_school": "physical"}
+        
+        return self._py_rng.choice(abilities)
+
 
     # ===== CREADORES DE EVENTOS =====
 
     def _create_damage_event(
-        self, 
+        self,
+        player: Player,
         session: RaidSession, 
         timestamp: datetime, 
         phase: BossPhase
     ) -> WoWRaidEvent:
         """Genera evento de daño."""
-        source = self._pick_player(session, role="dps")
-        ability = self._py_rng.choice(self._damage_abilities)
+        source = player
+        ability = self._get_ability(player, "damage")
         
         base_damage = float(self._rng.normal(loc=15000, scale=3000))
         damage = float(np.clip(base_damage * phase.damage_multiplier, 5000, 100000))
@@ -379,14 +411,15 @@ class WoWEventGenerator:
 
     def _create_heal_event(
         self, 
+        player: Player,
         session: RaidSession, 
         timestamp: datetime, 
         phase: BossPhase
     ) -> WoWRaidEvent:
         """Genera evento de curación."""
-        healer = self._pick_player(session, role="healer")
+        healer = player
         target = self._py_rng.choice(session.players)
-        ability = self._py_rng.choice(self._heal_abilities)
+        ability = ability = self._get_ability(player, "heal")
         
         base_heal = float(self._rng.normal(loc=9500, scale=2500))
         healing = float(np.clip(base_heal * phase.healing_multiplier, 3000, 40000))
@@ -432,14 +465,16 @@ class WoWEventGenerator:
 
     def _create_spell_cast_event(
         self, 
+        player: Player,
         session: RaidSession, 
         timestamp: datetime, 
         phase: BossPhase
     ) -> WoWRaidEvent:
         """Genera evento de spell_cast."""
-        caster = self._pick_player(session)
-        ability = self._py_rng.choice(self._damage_abilities + self._heal_abilities)
-        
+        caster = player
+        ability_type = "heal" if player.role == "healer" else "damage"
+        ability = self._get_ability(player, ability_type)
+
         encounter_duration_ms = int((timestamp - session.start_time).total_seconds() * 1000)
         
         return WoWRaidEvent(
@@ -475,12 +510,13 @@ class WoWEventGenerator:
         )
 
     def _create_mana_regen_event(
-        self, 
+        self,
+        player: Player, 
         session: RaidSession, 
         timestamp: datetime
     ) -> WoWRaidEvent:
         """Genera evento de regeneración de maná."""
-        caster = self._pick_player(session)
+        caster = player
         
         mana_before = float(self._rng.uniform(20, 80))
         mana_regen_rate = float(self._rng.uniform(50, 150))
@@ -503,7 +539,7 @@ class WoWEventGenerator:
             target_entity_id=caster.player_id,
             target_entity_name=caster.name,
             target_entity_type=EntityType.PLAYER,
-            resource_type=ResourceType.MANA,
+            resource_type=ResourceType(player.resource_type),
             resource_amount_before=mana_before,
             resource_amount_after=mana_after,
             resource_regeneration_rate=mana_regen_rate,
@@ -523,14 +559,15 @@ class WoWEventGenerator:
 
     def _create_player_death_event(
         self, 
+        victim: Player, 
         session: RaidSession, 
         timestamp: datetime, 
         phase: BossPhase
     ) -> WoWRaidEvent:
         """Genera evento de muerte de jugador."""
-        # Solo generar si probabilidad de fase lo permite
         if self._rng.random() > phase.death_probability:
-            return self._create_heal_event(session, timestamp, phase)
+            healer = self._pick_player(session, role="healer")
+            return self._create_heal_event(healer, session, timestamp, phase)
         
         victim = self._py_rng.choice(session.players)
         boss_ability = self._py_rng.choice(self._boss_abilities)
