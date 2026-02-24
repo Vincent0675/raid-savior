@@ -123,3 +123,27 @@ def test_damage_events_no_pure_healer_as_source(session, events):
         if profile["event_weights"]["combat_damage"] < 0.10:
             assert profile["abilities"]["damage"] != [], \
                 f"Healer puro {source.player_class}/{source.spec} generó combat_damage sin damage abilities"
+
+def test_boss_tracker_phase_transitions():
+    from src.generators.raid_event_generator import BossHPTracker
+    
+    tracker = BossHPTracker(max_hp=1_000_000)
+    assert tracker.current_phase_number == 1
+    assert tracker.hp_pct == 100.0
+    
+    # Cruzar umbral del 70%
+    changed = tracker.register_damage(310_000)
+    assert changed is True
+    assert tracker.current_phase_number == 2
+    assert tracker.hp_pct < 70.0
+    
+    # Cruzar umbral del 40%
+    changed = tracker.register_damage(300_000)
+    assert changed is True
+    assert tracker.current_phase_number == 3
+    assert tracker.hp_pct < 40.0
+    
+    # Daño sin transición
+    changed = tracker.register_damage(1_000)
+    assert changed is False
+    assert tracker.current_phase_number == 3

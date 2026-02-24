@@ -73,6 +73,41 @@ class BossPhase:
     healing_multiplier: float = 1.0
     death_probability: float = 0.0
 
+@dataclass
+class BossHPTracker:
+    """Representa el seguimiento de la salud del boss."""
+    max_hp: float
+    phase_thresholds: list[float] = field(
+        default_factory=lambda: [100.0, 70.0, 40.0, 0.0]
+    )
+    # Campos de estado - init=False: no se pasan al constructor
+    current_hp:          float = field(default=0.0, init=False)
+    current_phase_index: int   = field(default=0,   init=False)
+    
+    def __post_init__(self) -> None:
+        self.current_hp          = self.max_hp # empieza con HP completo
+        self.current_phase_index = 0           # empieza en fase 1 (es decir, índice 0)
+
+    @property
+    def hp_pct(self) -> float:
+        return (self.current_hp / self.max_hp) * 100.0
+
+    @property
+    def current_phase_number(self) -> int:
+        return self.current_phase_index + 1 # índice 0 -> fase 1
+
+    def register_damage(self, amount: float) -> bool:
+        self.current_hp = max(0.0, self.current_hp - amount)
+        
+        max_phase = len(self.phase_thresholds) - 2
+        if self.current_phase_index < max_phase:
+            next_threshold = self.phase_thresholds[self.current_phase_index + 1]
+            if self.hp_pct <= next_threshold:
+                self.current_phase_index += 1
+                return True
+        
+        return False
+
 
 @dataclass(frozen=True)
 class RaidSession:
@@ -214,68 +249,68 @@ class WoWEventGenerator:
         if not session.phases:
             return self._generate_simple_events(session, num_events)
         
-        # Generar eventos por fase
-        cumulative_time = 0
-        for phase in session.phases:
-            phase_start_ts = session.start_time.timestamp() + cumulative_time
-            phase_end_ts = phase_start_ts + phase.duration_s
-            
-            # Eventos proporcionales a duración de fase
-            total_duration = (session.end_time - session.start_time).total_seconds()
-            phase_event_count = int(num_events * (phase.duration_s / total_duration))
-            
-            # Timestamps con burst patterns
-            timestamps = self._generate_realistic_timestamps(
-                start_ts=phase_start_ts,
-                end_ts=phase_end_ts,
-                count=phase_event_count,
-                burst_intensity=0.6 if phase.phase_number >= 2 else 0.3
-            )
-            
-            # Boss phase event al inicio
-            if events or phase.phase_number > 1:
-                phase_event = self._create_boss_phase_event(
-                    session=session,
-                    timestamp=datetime.fromtimestamp(phase_start_ts, tz=timezone.utc),
-                    phase=phase
-                )
-                events.append(phase_event)
-            
-            # Generar eventos mixtos
-            for ts in timestamps:
-                timestamp = datetime.fromtimestamp(float(ts), tz=timezone.utc)
+        # Calcular max_hp proporcional al daño esperado de la raid
+        avg_damage_per_event    = 15_000
+        estimated_damage_events = int(num_events * 0.50)
+        max_hp = avg_damage_per_event * estimated_damage_events * 1.3
 
-                # 1. Elegir jugador primero
-                player = self._pick_player(session)
+        # Instanciar tracker y generar todos los timestamps de golpe
+        boss_tracker = BossHPTracker(max_hp=max_hp)
 
-                # 2. Obtener pesos de su spec
-                weights = SPEC_PROFILES[(player.player_class, player.spec)]["event_weights"]
-                event_types = list(weights.keys())
-                event_probs = list(weights.values())
+        start_ts = session.start_time.timestamp()
+        end_ts   = session.end_time.timestamp()
 
-                # 3. Samplear event_type según el perfil del jugador
-                etype = str(self._rng.choice(event_types, p=event_probs))
+        all_timestamps = self._generate_realistic_timestamps(
+            start_ts=start_ts,
+            end_ts=end_ts,
+            count=num_events,
+            burst_intensity=0.5
+        )
 
-                
-                # 4. Dispatch — nota: "combat_damage" no "damage"
-                if etype == "combat_damage":
-                    ev = self._create_damage_event(player, session, timestamp, phase)
-                elif etype == "heal":
-                    ev = self._create_heal_event(player, session, timestamp, phase)
-                elif etype == "spell_cast":
-                    ev = self._create_spell_cast_event(player, session, timestamp, phase)
-                elif etype == "mana_regen":
-                    ev = self._create_mana_regen_event(player, session, timestamp)
-                elif etype == "player_death":
-                    ev = self._create_player_death_event(player, session, timestamp, phase)
-                else:
-                    continue
-                events.append(ev)
-            
-            cumulative_time += phase.duration_s
-        
-        # Ordenar por timestamp
-        events.sort(key=lambda e: e.timestamp)
+        for ts in all_timestamps:
+            timestamp = datetime.fromtimestamp(float(ts), tz=timezone.utc)
+
+            # Fase actual según HP del boss — no según tiempo
+            phase_index = min(boss_tracker.current_phase_index, len(session.phases) - 1)
+            phase       = session.phases[phase_index]
+
+            # 1. Elegir jugador
+            player = self._pick_player(session)
+
+            # 2. Obtener pesos de su spec y samplear event_type
+            weights     = SPEC_PROFILES[(player.player_class, player.spec)]["event_weights"]
+            event_types = list(weights.keys())
+            event_probs = list(weights.values())
+            etype       = str(self._rng.choice(event_types, p=event_probs))
+
+            # 3. Dispatch
+            if etype == "combat_damage":
+                hp_before_hit = boss_tracker.hp_pct
+                ev = self._create_damage_event(player, session, timestamp, phase)
+                if ev.damage_amount:
+                    phase_changed = boss_tracker.register_damage(ev.damage_amount)
+                    if phase_changed:
+                        new_phase_index = min(boss_tracker.current_phase_index, len(session.phases) - 1)
+                        new_phase       = session.phases[new_phase_index]
+                        events.append(self._create_boss_phase_event(
+                            session,
+                            timestamp,
+                            new_phase,
+                            hp_pct_before=hp_before_hit,
+                            hp_pct_after=boss_tracker.hp_pct
+                            ))
+            elif etype == "heal":
+                ev = self._create_heal_event(player, session, timestamp, phase)
+            elif etype == "spell_cast":
+                ev = self._create_spell_cast_event(player, session, timestamp, phase)
+            elif etype == "mana_regen":
+                ev = self._create_mana_regen_event(player, session, timestamp)
+            elif etype == "player_death":
+                ev = self._create_player_death_event(player, session, timestamp, phase)
+            else:
+                continue
+
+            events.append(ev)
         return events
 
     def _generate_simple_events(self, session: RaidSession, num_events: int) -> List[WoWRaidEvent]:
@@ -612,9 +647,15 @@ class WoWEventGenerator:
         self, 
         session: RaidSession, 
         timestamp: datetime, 
-        phase: BossPhase
+        phase: BossPhase,
+        hp_pct_before: float | None = None,
+        hp_pct_after: float | None = None,
     ) -> WoWRaidEvent:
         """Genera evento de transición de fase del boss."""
+
+        hp_before = hp_pct_before if hp_pct_before is not None else float(100 - (phase.phase_number - 1) * 33)
+        hp_after  = hp_pct_after if hp_pct_after is not None else float(100 - phase.phase_number * 33)
+
         encounter_duration_ms = int((timestamp - session.start_time).total_seconds() * 1000)
         
         return WoWRaidEvent(
@@ -632,8 +673,8 @@ class WoWEventGenerator:
             target_entity_id=session.boss_id,
             target_entity_name=session.boss_name,
             target_entity_type=EntityType.BOSS,
-            target_entity_health_pct_before=float(100 - (phase.phase_number - 1) * 33),
-            target_entity_health_pct_after=float(100 - phase.phase_number * 33),
+            target_entity_health_pct_before=hp_before,
+            target_entity_health_pct_after=hp_after,
             damage_amount=None,
             healing_amount=None,
             is_critical_hit=False,
