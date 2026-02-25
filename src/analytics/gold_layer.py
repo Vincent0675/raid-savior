@@ -520,3 +520,102 @@ class GoldLayerETL:
         except Exception as exc:
             logger.error("[Gold ETL] ERROR INESPERADO: %s", exc, exc_info=True)
             raise RuntimeError(f"[Gold ETL] Error inesperado: {exc}") from exc
+
+    # ------------------------------------------------------------------ #
+    # DESCUBRIMIENTO AUTOMÁTICO DE PARTICIONES                           #
+    # ------------------------------------------------------------------ #
+
+    def discover_silver_partitions(self) -> list[tuple[str, str]]:
+        """
+        Lista todas las particiones únicas (raid_id, event_date) en Silver.
+
+        Parsea las claves Hive-style del bucket:
+            wow_raid_events/v1/raid_id={X}/event_date={Y}/part-xxx.parquet
+                                    ^^^               ^^^
+        Returns
+        -------
+        Lista de tuplas (raid_id, event_date) ordenadas alfabéticamente.
+        """
+        prefix  = "wow_raid_events/v1/"
+        objects = self.storage.list_objects(self.silver_bucket, prefix)
+
+        if not objects:
+            raise ValueError(
+                f"[discover_silver_partitions] Sin objetos en "
+                f"s3://{self.silver_bucket}/{prefix}"
+            )
+
+        partitions: set[tuple[str, str]] = set()
+
+        for key in objects:
+            # Ej: wow_raid_events/v1/raid_id=raid001/event_date=2026-02-25/part-xxx.parquet
+            segments = key.split("/")
+
+            raid_seg  = next((s for s in segments if s.startswith("raid_id=")),    None)
+            date_seg  = next((s for s in segments if s.startswith("event_date=")), None)
+
+            if raid_seg and date_seg:
+                raid_id    = raid_seg.split("=", 1)[1]
+                event_date = date_seg.split("=", 1)[1]
+                partitions.add((raid_id, event_date))
+
+        discovered = sorted(partitions)
+        logger.info(
+            "[discover_silver_partitions] %d partición(es) encontrada(s): %s",
+            len(discovered), discovered,
+        )
+        return discovered
+
+
+    def run_all(self) -> dict[str, Any]:
+        """
+        Ejecuta el pipeline Gold para TODAS las particiones disponibles en Silver.
+
+        Itera sobre discover_silver_partitions() y llama run_for_partition()
+        por cada una. Acumula resultados y errores sin detener el batch
+        ante fallos individuales (fault-tolerant).
+
+        Returns
+        -------
+        Dict con métricas globales del batch: total, exitosos, fallidos.
+        """
+        partitions = self.discover_silver_partitions()
+
+        logger.info(
+            "[Gold ETL run_all] Iniciando batch — %d partición(es).", len(partitions)
+        )
+
+        results: list[dict] = []
+        errors:  list[dict] = []
+
+        for i, (raid_id, event_date) in enumerate(partitions, start=1):
+            logger.info(
+                "[Gold ETL run_all] (%d/%d) Procesando raid_id=%s / event_date=%s",
+                i, len(partitions), raid_id, event_date,
+            )
+            try:
+                result = self.run_for_partition(raid_id, event_date)
+                results.append(result)
+            except Exception as exc:
+                logger.error(
+                    "[Gold ETL run_all] FALLO en %s/%s: %s",
+                    raid_id, event_date, exc,
+                )
+                errors.append({
+                    "raid_id":    raid_id,
+                    "event_date": event_date,
+                    "error":      str(exc),
+                })
+
+        summary = {
+            "total_partitions": len(partitions),
+            "successful":       len(results),
+            "failed":           len(errors),
+            "results":          results,
+            "errors":           errors,
+        }
+        logger.info(
+            "[Gold ETL run_all] Batch completado — %d OK / %d FAIL",
+            len(results), len(errors),
+        )
+        return summary

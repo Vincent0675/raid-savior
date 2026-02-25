@@ -61,6 +61,45 @@ def _object_size(storage: MinIOStorageClient, bucket: str, key: str) -> int:
     response = storage.s3.head_object(Bucket=bucket, Key=key)
     return response["ContentLength"]
 
+def discover_gold_partitions(
+    storage: MinIOStorageClient, bucket: str
+) -> list[tuple[str, str]]:
+    """
+    Descubre particiones únicas (raid_id, event_date) desde el bucket Gold.
+
+    Parsea claves de fact_raid_summary, la única tabla con ambas dimensiones:
+        fact_raid_summary/raid_id={X}/event_date={Y}/fact_raid_summary.parquet
+
+    Returns
+    -------
+    Lista de (raid_id, event_date) ordenada alfabéticamente.
+    """
+    prefix   = "fact_raid_summary/"
+    contents = []
+
+    response = storage.s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    contents += response.get("Contents", [])
+
+    while response.get("IsTruncated", False):
+        response = storage.s3.list_objects_v2(
+            Bucket=bucket,
+            Prefix=prefix,
+            ContinuationToken=response["NextContinuationToken"],
+        )
+        contents += response.get("Contents", [])
+
+    partitions: set[tuple[str, str]] = set()
+    for obj in contents:
+        parts    = obj["Key"].split("/")
+        raid_seg = next((s for s in parts if s.startswith("raid_id=")),    None)
+        date_seg = next((s for s in parts if s.startswith("event_date=")), None)
+        if raid_seg and date_seg:
+            partitions.add((
+                raid_seg.split("=", 1)[1],
+                date_seg.split("=", 1)[1],
+            ))
+
+    return sorted(partitions)
 
 # ============================================================================
 # SECCIONES DE INSPECCION
@@ -244,6 +283,60 @@ def inspect_fact_player_stats(
         print(f"  [ERROR] No se pudo leer fact_player_raid_stats: {exc}")
         return pd.DataFrame()
 
+def inspect_partition_compact(
+    storage: MinIOStorageClient,
+    bucket: str,
+    raid_id: str,
+    event_date: str,
+) -> dict:
+    """
+    Extrae métricas clave de una partición sin imprimir.
+    Usado por inspect_all() para construir la tabla consolidada.
+
+    Returns dict con: raid_id, event_date, outcome, total_damage,
+    raid_dps, total_healing, raid_hps, deaths, n_players, coherence_ok,
+    coherence_total, error (si falla la lectura).
+    """
+    result = {
+        "raid_id":       raid_id,
+        "event_date":    event_date,
+        "error":         None,
+    }
+
+    try:
+        key_summary = (
+            f"fact_raid_summary/raid_id={raid_id}/"
+            f"event_date={event_date}/fact_raid_summary.parquet"
+        )
+        key_players = (
+            f"fact_player_raid_stats/raid_id={raid_id}/"
+            f"event_date={event_date}/fact_player_raid_stats.parquet"
+        )
+        key_dim_raid = f"dim_raid/raid_id={raid_id}/dim_raid.parquet"
+
+        df_summary  = _read_parquet(storage, bucket, key_summary)
+        df_players  = _read_parquet(storage, bucket, key_players)
+        df_dim_raid = _read_parquet(storage, bucket, key_dim_raid)
+        row = df_summary.iloc[0]
+
+        result.update({
+            "outcome":        row["raid_outcome"],
+            "total_damage":   row["total_damage"],
+            "total_healing":  row["total_healing"],
+            "raid_dps":       row["raid_dps"],
+            "raid_hps":       row["raid_hps"],
+            "deaths":         int(row["total_player_deaths"]),
+            "n_players":      int(row["n_players"]),
+            "boss_min_hp":    row["boss_min_hp_pct"],
+            # Coherencia rápida: damage_share suma ≈ 1.0
+            "coherence_ok":   abs(df_players["damage_share"].sum() - 1.0) < 0.01,
+        })
+
+    except Exception as exc:
+        result["error"] = str(exc)
+
+    return result
+
 
 # ============================================================================
 # VERIFICACIONES DE COHERENCIA
@@ -370,6 +463,133 @@ def check_coherence(
     else:
         print("  Revisa los fallos antes de usar Gold en dashboards o modelos.")
 
+def inspect_all(
+    storage: MinIOStorageClient, bucket: str
+) -> None:
+    """
+    Inspecciona TODAS las particiones Gold con vista consolidada.
+
+    Flujo:
+        1. Descubrir particiones desde fact_raid_summary/
+        2. dim_player → mostrar una vez (es global)
+        3. Tabla consolidada por partición
+        4. Top 5 DPS / HPS acumulados
+        5. Resumen de coherencia
+    """
+    partitions = discover_gold_partitions(storage, bucket)
+
+    _separator(f"INSPECCIÓN BATCH GOLD — {len(partitions)} partición(es)")
+    print(f"  Bucket: s3://{bucket}/\n")
+
+    if not partitions:
+        print("  [ERROR] No se encontraron particiones en Gold.")
+        return
+
+    # ── 1. dim_player (global, solo una vez) ──────────────────────────────
+    inspect_dim_player(storage, bucket)
+
+    # ── 2. Tabla consolidada de particiones ───────────────────────────────
+    _separator("[ fact_raid_summary ] Vista Consolidada")
+
+    rows = []
+    errors = []
+    for raid_id, event_date in partitions:
+        r = inspect_partition_compact(storage, bucket, raid_id, event_date)
+        if r["error"]:
+            errors.append(r)
+        else:
+            rows.append(r)
+
+    # Cabecera tabla
+    print(f"\n  {'raid_id':<10} {'date':<13} {'outcome':<9} "
+          f"{'total_dmg':>13} {'dps':>9} {'hps':>9} "
+          f"{'deaths':>7} {'players':>8} {'boss_hp%':>9}")
+    print(f"  {'─'*10} {'─'*13} {'─'*9} "
+          f"{'─'*13} {'─'*9} {'─'*9} "
+          f"{'─'*7} {'─'*8} {'─'*9}")
+
+    total_damage   = 0.0
+    total_healing  = 0.0
+    total_deaths   = 0
+    coherence_fails = 0
+
+    for r in rows:
+        outcome_tag = "✅ SUCCESS" if r["outcome"] == "success" else "❌ WIPE   "
+        coh_tag     = "" if r["coherence_ok"] else " ⚠️"
+        if not r["coherence_ok"]:
+            coherence_fails += 1
+        total_damage  += r["total_damage"]
+        total_healing += r["total_healing"]
+        total_deaths  += r["deaths"]
+
+        print(
+            f"  {r['raid_id']:<10} {r['event_date']:<13} {outcome_tag:<9} "
+            f"  {r['total_damage']:>12,.0f} {r['raid_dps']:>9,.0f} "
+            f"{r['raid_hps']:>9,.0f} {r['deaths']:>7} "
+            f"{r['n_players']:>8} {r['boss_min_hp']:>8.1f}%{coh_tag}"
+        )
+
+    # ── 3. Totales globales ────────────────────────────────────────────────
+    print(f"\n  {'TOTAL':<10} {'':13} {'':9} "
+          f"  {total_damage:>12,.0f} {'':>9} {'':>9} "
+          f"{total_deaths:>7} {'':>8}")
+
+    # ── 4. Top 5 DPS acumulado entre todas las particiones ────────────────
+    _separator("[ Top Performers ] DPS / HPS Acumulado (todas las raids)")
+    all_players: list[pd.DataFrame] = []
+
+    for raid_id, event_date in partitions:
+        key = (f"fact_player_raid_stats/raid_id={raid_id}/"
+               f"event_date={event_date}/fact_player_raid_stats.parquet")
+        try:
+            df = _read_parquet(storage, bucket, key)
+            all_players.append(df)
+        except Exception:
+            pass
+
+    if all_players:
+        df_all = pd.concat(all_players, ignore_index=True)
+
+        # Agrupa por jugador y suma DPS × raids (media ponderada real)
+        agg = (
+            df_all.groupby(["player_id", "player_name", "player_class", "player_role"])
+            .agg(avg_dps=("dps", "mean"), avg_hps=("hps", "mean"), raids=("dps", "count"))
+            .reset_index()
+            .sort_values("avg_dps", ascending=False)
+        )
+
+        print("\n  Top 5 DPS promedio:")
+        for _, p in agg.head(5).iterrows():
+            print(f"    {p['player_name']:>12} ({p['player_class']:>12}, "
+                  f"{p['player_role']:>7}) → {p['avg_dps']:>9,.1f} DPS "
+                  f"[{int(p['raids'])} raid(s)]")
+
+        healers = agg[agg["avg_hps"] > 0]
+        if not healers.empty:
+            print("\n  Top 5 HPS promedio:")
+            for _, p in healers.head(5).iterrows():
+                print(f"    {p['player_name']:>12} ({p['player_class']:>12}, "
+                      f"{p['player_role']:>7}) → {p['avg_hps']:>9,.1f} HPS "
+                      f"[{int(p['raids'])} raid(s)]")
+
+    # ── 5. Resumen final ───────────────────────────────────────────────────
+    _separator("[ Resumen Batch ]")
+    print(f"  Particiones inspeccionadas : {len(rows)}")
+    print(f"  Errores de lectura         : {len(errors)}")
+    print(f"  Coherencia fallida         : {coherence_fails}")
+    print(f"  Daño total acumulado       : {total_damage:>20,.0f}")
+    print(f"  Curación total acumulada   : {total_healing:>20,.0f}")
+    print(f"  Muertes totales            : {total_deaths}")
+
+    if errors:
+        print("\n  Particiones con error:")
+        for e in errors:
+            print(f"    • {e['raid_id']} / {e['event_date']}: {e['error']}")
+
+    if coherence_fails == 0 and not errors:
+        print("\n  ✅ Gold layer íntegra. Lista para PySpark / Grafana.")
+    else:
+        print("\n  ⚠️  Revisa los errores antes de continuar.")
 
 # ============================================================================
 # CLI
@@ -377,38 +597,55 @@ def check_coherence(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Inspector de la capa Gold -- WoW Raid Telemetry Pipeline",
+        description="Inspector de la capa Gold — WoW Raid Telemetry Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Ejemplo:\n"
-            "  python src/analytics/inspect_gold.py --raid-id raid001 --event-date 2026-02-19"
+            "Ejemplos:\n"
+            "  python -m src.analytics.inspect_gold --all\n"
+            "  python -m src.analytics.inspect_gold --raid-id raid001 --event-date 2026-02-25\n"
         ),
     )
-    parser.add_argument(
-        "--raid-id",
-        type=str,
-        required=True,
-        help="Identificador de la raid (ej. raid001)",
+
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--all",
+        action="store_true",
+        help="Inspecciona TODAS las particiones Gold con vista consolidada.",
     )
+    mode.add_argument(
+        "--raid-id",
+        metavar="RAID_ID",
+        help="Deep-dive en una partición concreta. Requiere --event-date.",
+    )
+
     parser.add_argument(
         "--event-date",
-        type=str,
-        required=True,
-        help="Fecha del evento en formato YYYY-MM-DD",
+        metavar="YYYY-MM-DD",
+        help="Fecha de partición. Requerido con --raid-id.",
     )
     return parser.parse_args()
 
 
 def main() -> None:
-    args       = parse_args()
-    raid_id    = args.raid_id
-    event_date = args.event_date
-
+    args    = parse_args()
     config  = Config()
     storage = MinIOStorageClient()
     bucket  = config.S3_BUCKET_GOLD
 
-    print("\nINSPECTOR DE CAPA GOLD -- WoW Raid Telemetry Pipeline")
+    # ── Modo --all ─────────────────────────────────────────────────────────
+    if args.all:
+        inspect_all(storage, bucket)
+        return
+
+    # ── Validación modo partición única ────────────────────────────────────
+    if not args.event_date:
+        print("❌ --event-date es obligatorio cuando se usa --raid-id.")
+        sys.exit(1)
+
+    raid_id, event_date = args.raid_id, args.event_date
+
+    # ── Deep-dive (comportamiento original) ───────────────────────────────
+    print("\nINSPECTOR DE CAPA GOLD — Deep Dive")
     print(f"  Raid  : {raid_id}")
     print(f"  Fecha : {event_date}")
     print(f"  Bucket: s3://{bucket}/")
@@ -421,7 +658,7 @@ def main() -> None:
     check_coherence(df_dim_player, df_dim_raid, df_summary, df_players)
 
     _separator()
-    print("INSPECCION COMPLETADA\n")
+    print("INSPECCIÓN COMPLETADA\n")
 
 
 if __name__ == "__main__":

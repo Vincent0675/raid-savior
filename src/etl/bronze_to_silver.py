@@ -5,6 +5,8 @@ Lectura de JSON crudo -> Transformación Pandas -> Escritura Parquet particionad
 Soporta dos formatos de entrada:
 1. Envelope (HTTP): {"batch_id": "...", "events": [...]}
 2. Array directo (S3): [...]
+
+v2. Bug arreglado en la transformación y carga de los batches que se encuentran en Bronze.
 """
 
 import sys
@@ -113,46 +115,45 @@ class BronzeToSilverETL:
         
         # 1. READ
         raw_data = self.read_bronze_batch(bronze_key)
+
+        # ── EXTRACCIÓN DE BATCH_ID (SIEMPRE DESDE EL FILENAME) ────────────
+        # El filename es la fuente de verdad: es determinista, único por
+        # archivo y no depende del contenido del payload.
+        # Regex sin restricción de charset → funciona con 0001, UUIDs, etc.
+        filename_match = re.search(r'batch_([^/]+?)\.json$', bronze_key)
+        batch_id = filename_match.group(1) if filename_match else None
+        
+        if batch_id is None:
+            # Fallback de emergencia: nunca debería llegar aquí
+            import hashlib
+            batch_id = hashlib.md5(bronze_key.encode()).hexdigest()[:8]
+            print(f"  [WARN] batch_id derivado de hash para: {bronze_key}")
         
         # 2. NORMALIZAR FORMATO
         # Detectar si es envelope (dict) o array directo (list)
         if isinstance(raw_data, dict):
-            # Formato HTTP: Extraer 'events'
             events_list = raw_data.get('events', [])
-            batch_id = raw_data.get('batch_id', 'unknown')
-            
             if not events_list:
                 return {"status": "skipped", "reason": "no_events_in_envelope"}
-        
+
         elif isinstance(raw_data, list):
-            # Formato S3 directo: Ya es lista de eventos
             events_list = raw_data
-            
-            # Generar batch_id desde el filename
-            # Ej: batch_709369ff-192f-4ee7.json → 709369ff-192f-4ee7
-            match = re.search(r'batch_([a-f0-9\-]+)\.json', bronze_key)
-            batch_id = match.group(1) if match else 'unknown'
-            
             if not events_list:
                 return {"status": "skipped", "reason": "empty_array"}
-        
+
         else:
-            return {
-                "status": "error", 
-                "reason": f"unknown_json_type: {type(raw_data)}"
-            }
+            return {"status": "error", "reason": f"unknown_json_type: {type(raw_data)}"}
         
         # 3. TRANSFORM
         df_raw = pd.DataFrame(events_list)
         df_silver, metadata = self.transformer.transform_pipeline(df_raw)
-        
+
         # 4. WRITE
         raid_id = df_silver['raid_id'].iloc[0] if 'raid_id' in df_silver.columns else 'unknown'
-        
         storage_result = self.save_silver(df_silver, raid_id, batch_id)
-        
+
         return {
             "status": "success",
             "metadata": metadata,
-            "storage": storage_result
+            "storage": storage_result,
         }
