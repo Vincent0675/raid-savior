@@ -4,14 +4,14 @@ from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 from src.config import Config
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env", override=True)
 
 # Fallback: construye las rutas por defecto si no hay variable de entorno
 
 _jar_default = (
-    str(Path.home() / "spark-jars" / "hadoop-aws-3.4.1.jar" )
+    str(Path.home() / "spark-jars" / "hadoop-aws-3.3.6.jar")
     + ","
-    + str(Path.home() / "spark-jars" / "bundle-2.24.6.jar" )
+    + str(Path.home() / "spark-jars" / "aws-java-sdk-bundle-1.12.786.jar")
 )
 
 SPARK_JARS = os.getenv("SPARK_JARS_PATH", _jar_default)
@@ -21,7 +21,7 @@ SPARK_JARS = os.getenv("SPARK_JARS_PATH", _jar_default)
 def get_spark_session(app_name: str = "WoWRaidTelemetry") -> SparkSession:
     """
     Crea o reutiliza una SparkSession configurada para MinIO via S3A.
-    Usa AWS SDK v2 (hadoop-aws 3.4.1 + bundle-2.24.6).
+    Usa AWS SDK v1 (hadoop-aws 3.3.6 + aws-java-sdk-bundle-1.12.786).
     """
     return (
         SparkSession.builder
