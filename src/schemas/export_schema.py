@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Export formal JSON Schema from Pydantic models.
 Interoperable contract for documentation and external systems.

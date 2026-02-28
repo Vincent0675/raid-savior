@@ -4,8 +4,8 @@
 **Autor:** Byron V. Blatch Rodriguez   
 **Profesor:** Francisco Javier Ortega   
 **Repositorio:** [github.com/Vincent0675/raid-savior](https://github.com/Vincent0675/raid-savior)   
-**Estado:** Fase 4 (Gold) completada. Fase E (PySpark) en curso.   
-**Última actualización:** 25 de febrero de 2026.   
+**Estado:** Fase 4 (Gold) completada. Fase E (PySpark) completada.   
+**Última actualización:** 28 de febrero de 2026.   
 
 ***
 
