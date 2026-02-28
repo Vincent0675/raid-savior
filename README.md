@@ -19,14 +19,44 @@ y formato columnar Parquet en Silver/Gold.
 **Resultados actuales del dataset de producción:**
 
 
+### Volumen de datos procesados
+
+| Capa | Bucket MinIO | Raids | Eventos | Formato |
+|------|-------------|-------|---------|---------|
+| Bronze | `bronze` | 10 | ~500.000 | JSON (Hive-style) |
+| Silver | `silver` | 10 | 500.019 | Parquet + Snappy |
+| Gold | `gold` | 10 | — | Parquet + Snappy |
+
+### Tablas Gold generadas (modelo semidimensional)
+
+| Tabla | Filas | Columnas | Partición | Descripción |
+|-------|-------|----------|-----------|-------------|
+| `fact_raid_summary` | 10 | 9 | `raid_id` | KPIs macro por raid |
+| `fact_player_raid_stats` | 200 | 11 | `raid_id` | KPIs por jugador/raid |
+| `dim_player` | 200 | 7 | — | Dimensión jugadores únicos |
+| `dim_raid` | 10 | 6 | `raid_id` | Dimensión raids |
+
+### Stack tecnológico por fase
+
+| Fase | Tecnología principal | Estado |
+|------|---------------------|--------|
+| 1 — Schema y generador | Pydantic v2 · NumPy | ✅ Completada |
+| 2 — Ingesta HTTP | Flask · MinIO · Docker | ✅ Completada |
+| 3 — ETL Bronze→Silver | Pandas · PyArrow · Parquet | ✅ Completada |
+| 4 — ETL Silver→Gold (Pandas) | DuckDB · Pydantic v2 | ✅ Completada |
+| E — ETL Silver→Gold (Spark) | PySpark 3.5 · S3A · MinIO | ✅ Completada |
+| F — Orquestación | Dagster | 🔄 En progreso |
+
+### Rendimiento Spark (entorno local)
+
 | Métrica | Valor |
-| :-- | :-- |
-| Eventos ingresados | 505.000 (10 raids × 50.500) |
-| Archivos Bronze | 1.010 JSON — 546.9 MB |
-| Archivos Silver | 1.010 Parquet (Snappy) |
-| Particiones Gold | 10 (1 por raid) |
-| Daño total acumulado | 4.866.754.996 |
-| Jugadores únicos | 200 |
+|---------|-------|
+| Filas procesadas | 500.019 |
+| Particiones RDD | 32 |
+| Tiempo lectura Silver | ~6 s |
+| Tiempo escritura Gold (4 tablas) | 22.4 s |
+| Hardware | ASUS TUF A15 · RTX 3050 · Pop!\_OS |
+
 | Coherencia Gold | ✅ 0 fallos |
 
 

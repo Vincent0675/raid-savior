@@ -9,6 +9,7 @@ Tablas producidas:
     s3a://gold/fact_player_raid_stats/
 """
 from __future__ import annotations
+import time
 
 import logging
 from pyspark.sql import SparkSession, DataFrame
@@ -185,6 +186,7 @@ def write_gold(df: DataFrame, table_name: str, partition_col: str = "raid_id") -
     logger.info("[write_gold] %s OK.", table_name)
 
 def main() -> None:
+    t_start = time.perf_counter()
     spark = get_spark_session(app_name="WoWRaidGoldETL")
     try:
         df_silver = read_silver(spark)
@@ -209,7 +211,8 @@ def main() -> None:
         write_gold(dim_player,   "dim_player",   None)         # sin partición
         write_gold(dim_raid,     "dim_raid",     "raid_id")    # partitionBy raid_id
 
-        logger.info("[main] ✅ Pipeline Gold Spark completo — 4 tablas escritas.")
+        t_end = time.perf_counter()
+        logger.info("[main] ✅ Pipeline Gold Spark completo — 4 Tablas escritas totales — %.1fs totales.", t_end - t_start)
     finally:
         stop_spark_session(spark)
 
