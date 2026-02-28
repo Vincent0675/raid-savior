@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-# Cargar variables del .env si existe (buena práctica local)
+# Cargar variables del .env si existe
 load_dotenv()
 
 class Config:

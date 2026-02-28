@@ -326,6 +326,7 @@ python src/generators/generate_massive_http.py \
 | API e ingesta | Flask 3.x, python-dotenv |
 | Object storage | MinIO (S3-compatible), boto3 |
 | Procesamiento ETL | Pandas 2.x, PyArrow |
+| Procesamiento distribuido | PySpark 3.5.8 (local*), DuckDB |
 | Formato de almacenamiento | Apache Parquet + Snappy |
 | Contenedores | Docker, Docker Compose |
 | Testing | pytest |
@@ -334,7 +335,6 @@ python src/generators/generate_massive_http.py \
 
 | Capa | Tecnología |
 | :-- | :-- |
-| Procesamiento distribuido | PySpark (local*), DuckDB |
 | Table format | Delta Lake → Apache Iceberg |
 | Orquestación | Dagster (asset-based) |
 | Visualización | Grafana, Apache Superset |
@@ -356,6 +356,10 @@ cd raid-savior
 mamba create -n wow-telemetry python=3.10
 mamba activate wow-telemetry
 pip install -r requirements.txt
+
+# Descargar JARs de Spark (una sola vez)
+chmod +x scripts/download_spark_jars.sh
+./scripts/download_spark_jars.sh
 
 # Variables de entorno (.env)
 S3_ENDPOINT_URL=http://localhost:9000

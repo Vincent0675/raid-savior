@@ -22,3 +22,8 @@ s3fs>=2026.1.0     # Soporte S3 para Pandas/Fsspec
 
 # --- Agregaciones y Métricas de Negocios: Silver layer to Gold layer ---
 python-duckdb>=1.4.3 
+
+# --- Conexión y procesamiento distribuido con PySpark en comunicación con S3 (MinIO) ---
+pyspark=3.5.8 # Motor distribuido local (JVM via OpenJDK 17)
+jupyter
+openjdk=17
