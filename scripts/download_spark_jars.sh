@@ -12,15 +12,18 @@ MAVEN="https://repo1.maven.org/maven2"
 
 echo "📦 Descargando JARs en $JAR_DIR ..."
 
-[ -f "$JAR_DIR/hadoop-aws-3.3.6.jar" ] || \
-    wget -q --show-progress \
-    "$MAVEN/org/apache/hadoop/hadoop-aws/3.3.6/hadoop-aws-3.3.6.jar" \
-    -O "$JAR_DIR/hadoop-aws-3.3.6.jar"
+HADOOP_AWS="hadoop-aws-3.3.4.jar"
+SDK_BUNDLE="aws-java-sdk-bundle-1.12.262.jar"
 
-[ -f "$JAR_DIR/aws-java-sdk-bundle-1.12.786.jar" ] || \
+[ -f "$JAR_DIR/$HADOOP_AWS" ] || \
     wget -q --show-progress \
-    "$MAVEN/com/amazonaws/aws-java-sdk-bundle/1.12.786/aws-java-sdk-bundle-1.12.786.jar" \
-    -O "$JAR_DIR/aws-java-sdk-bundle-1.12.786.jar"
+    "$MAVEN/org/apache/hadoop/hadoop-aws/3.3.4/$HADOOP_AWS" \
+    -O "$JAR_DIR/$HADOOP_AWS"
+
+[ -f "$JAR_DIR/$SDK_BUNDLE" ] || \
+    wget -q --show-progress \
+    "$MAVEN/com/amazonaws/aws-java-sdk-bundle/1.12.262/$SDK_BUNDLE" \
+    -O "$JAR_DIR/$SDK_BUNDLE"
 
 echo "✅ JARs listos:"
 ls -lh "$JAR_DIR"

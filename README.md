@@ -326,7 +326,7 @@ python src/generators/generate_massive_http.py \
 | API e ingesta | Flask 3.x, python-dotenv |
 | Object storage | MinIO (S3-compatible), boto3 |
 | Procesamiento ETL | Pandas 2.x, PyArrow |
-| Procesamiento distribuido | PySpark 3.5.8 (local*), DuckDB |
+| Procesamiento distribuido | PySpark 3.5.4 (local*), DuckDB |
 | Formato de almacenamiento | Apache Parquet + Snappy |
 | Contenedores | Docker, Docker Compose |
 | Testing | pytest |
