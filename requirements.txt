@@ -27,3 +27,8 @@ python-duckdb>=1.4.3
 pyspark=3.5.8 # Motor distribuido local (JVM via OpenJDK 17)
 jupyter
 openjdk=17
+
+# --- Orquestación ---
+dagster>=1.12.17
+dagster-webserver>=1.12.17
+dagster-aws>=0.26.17        # Resources S3/MinIO para Dagster

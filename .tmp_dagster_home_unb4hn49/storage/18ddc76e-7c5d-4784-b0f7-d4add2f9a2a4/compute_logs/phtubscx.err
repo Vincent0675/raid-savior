@@ -1,0 +1,7 @@
+[32m2026-03-02 19:14:44 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 368929 - LOGS_CAPTURED - Started capturing logs in process (pid: 368929).
+[32m2026-03-02 19:14:44 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 368929 - silver_events - STEP_START - Started execution of step "silver_events".
+[32m2026-03-02 19:14:44 +0100[0m - dagster - [34mINFO[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - silver_events - Listando archivos JSON en Bronze...
+[32m2026-03-02 19:14:44 +0100[0m - dagster - [34mINFO[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - silver_events - Encontrados 1000 archivos
+[32m2026-03-02 19:15:16 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 368929 - silver_events - STEP_OUTPUT - Yielded output "result" of type "Any". (Type check passed).
+[32m2026-03-02 19:15:16 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 368929 - silver_events - ASSET_MATERIALIZATION - Materialized value silver_events.
+[32m2026-03-02 19:15:16 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 368929 - silver_events - STEP_SUCCESS - Finished execution of step "silver_events" in 31.82s.
