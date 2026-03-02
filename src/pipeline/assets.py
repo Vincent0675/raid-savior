@@ -166,3 +166,31 @@ def gold_tables_spark(context: AssetExecutionContext) -> MaterializeResult:
         )
     finally:
         stop_spark_session(spark)   # ← se ejecuta siempre, incluso si hay excepción
+
+@asset(
+    group_name="medallion",
+    deps=["silver_events"],
+    description="ETL Silver → Gold Pandas/DuckDB: 4 tablas Gold por partición con validación Pydantic"
+)
+def gold_tables_duckdb(context: AssetExecutionContext) -> MaterializeResult:
+    from src.analytics.gold_layer import GoldLayerETL
+
+    etl = GoldLayerETL()
+    context.log.info("Descubriendo particiones Silver...")
+
+    summary = etl.run_all()   # descubre + procesa todas las particiones
+
+    # Loguear particiones fallidas individualmente si las hay
+    for err in summary.get("errors", []):
+        context.log.warning(
+            f"Partición fallida: raid_id={err['raid_id']} "
+            f"event_date={err['event_date']} → {err['error']}"
+        )
+
+    return MaterializeResult(
+        metadata={
+            "particiones_procesadas": MetadataValue.int(summary["total_partitions"]),
+            "exitosas":               MetadataValue.int(summary["successful"]),
+            "fallidas":               MetadataValue.int(summary["failed"]),
+        }
+    )
