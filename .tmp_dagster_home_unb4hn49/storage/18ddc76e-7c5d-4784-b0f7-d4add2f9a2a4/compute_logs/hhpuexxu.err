@@ -1,7 +1,0 @@
-[32m2026-03-02 19:14:22 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 367698 - LOGS_CAPTURED - Started capturing logs in process (pid: 367698).
-[32m2026-03-02 19:14:22 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 367698 - bronze_raw_events - STEP_START - Started execution of step "bronze_raw_events".
-[32m2026-03-02 19:14:22 +0100[0m - dagster - [34mINFO[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - bronze_raw_events - Raids detectados: ['raid001', 'raid002', 'raid003', 'raid004', 'raid005', 'raid006', 'raid007', 'raid008', 'raid009', 'raid010']
-[32m2026-03-02 19:14:22 +0100[0m - dagster - [34mINFO[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - bronze_raw_events - Total archivos a subir: 1010
-[32m2026-03-02 19:14:42 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 367698 - bronze_raw_events - STEP_OUTPUT - Yielded output "result" of type "Any". (Type check passed).
-[32m2026-03-02 19:14:42 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 367698 - bronze_raw_events - ASSET_MATERIALIZATION - Materialized value bronze_raw_events.
-[32m2026-03-02 19:14:42 +0100[0m - dagster - [34mDEBUG[0m - medallion_pipeline_job - 18ddc76e-7c5d-4784-b0f7-d4add2f9a2a4 - 367698 - bronze_raw_events - STEP_SUCCESS - Finished execution of step "bronze_raw_events" in 20.5s.
