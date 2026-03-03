@@ -42,7 +42,7 @@ def test_fase_1_generacion():
     
     print(f"   ✅ Generados {len(eventos)} eventos")
     print(f"   📊 Tipos: {set(e.event_type for e in eventos)}")
-    return eventos
+    assert len(eventos) >= NUM_EVENTOS, f"Se esperaban al menos {NUM_EVENTOS} eventos, se obtuvieron {len(eventos)}"
 
 def test_fase_2_ingestion(eventos):
     """Fase 2: Enviar eventos al receptor HTTP (Bronze)"""
@@ -69,7 +69,7 @@ def test_fase_2_ingestion(eventos):
         result = response.json()
         batch_id = result.get("batch_id")
         print(f"   ✅ Batch ingestado correctamente: {batch_id}")
-        return batch_id
+        assert batch_id is not None, "El receptor no devolvió batch_id"
     else:
         print(f"   ❌ ERROR en ingesta: {response.status_code}")
         print(f"   {response.text}")
@@ -102,7 +102,7 @@ def test_fase_3_transformation(batch_id):
             print(f"   ✅ Transformación exitosa")
             print(f"      - Eventos procesados: {result['metadata']['rows_after_validation']}")
             print(f"      - Archivo Parquet: {result['storage']['s3_path']}")
-            return result['storage']['s3_path']
+            assert s3_path is not None, "El ETL no devolvió s3_path"
         else:
             print(f"   ⚠️ SKIPPED: {result.get('reason')}")
             return None
@@ -142,7 +142,6 @@ def test_fase_3_verification(s3_path):
         assert 'is_massive_hit' in df.columns, "Falta columna enriquecida is_massive_hit"
         
         print(f"   ✅ Todas las validaciones pasaron")
-        return True
         
     except Exception as e:
         print(f"   ❌ ERROR en verificación: {e}")

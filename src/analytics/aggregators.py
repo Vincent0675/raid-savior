@@ -10,11 +10,11 @@ def build_raid_summary(df_silver: pd.DataFrame) -> pd.DataFrame:
     df_silver : pd.DataFrame
         DataFrame de eventos de la capa Silver. Debe contener, como mínimo,
         las columnas:
-        - raidid, timestamp, eventdate
-        - eventtype
-        - damageamount, healingamount
-        - targetentitytype, targetentityhealthpctafter
-        - sourceplayerid, sourceplayerrole
+        - raid_id, timestamp, event_date
+        - event_type
+        - damage_amount, healing_amount
+        - target_entity_type, target_entity_health_pct_after
+        - source_player_id, source_player_role
 
     Devuelve
     --------
@@ -33,7 +33,7 @@ def build_raid_summary(df_silver: pd.DataFrame) -> pd.DataFrame:
 
     # 2.- Cálculo de agregados base por raid
     # Duración y nº de jugadores
-    group = df.groupby("raidid")
+    group = df.groupby("raid_id")
 
     duration = (
         group["timestamp"]
@@ -42,14 +42,14 @@ def build_raid_summary(df_silver: pd.DataFrame) -> pd.DataFrame:
     )
 
     n_players = (
-        group["sourceplayerid"]
+        group["source_player_id"]
         .nunique()
         .rename("n_players")
     )
 
     # Contar jugadores por rol (tank, healer, dps)
     role_counts = (
-        df.groupby(["raidid", "sourceplayerrole"])["sourceplayerid"]
+        df.groupby(["raid_id", "source_player_role"])["source_player_id"]
         .nunique()
         .unstack(fill_value=0)
     )
@@ -64,41 +64,41 @@ def build_raid_summary(df_silver: pd.DataFrame) -> pd.DataFrame:
     # Renombrar columnas a n_tanks, n_healers, n_dps
     role_counts = role_counts.rename(
         columns={
-            "raidid": "raidid",
+            "raid_id": "raid_id",
             "tank": "n_tanks",
             "healer": "n_healers",
             "dps": "n_dps",
         }
     )
 
-    # event_date: mínimo eventdate
+    # event_date: mínimo event_date
     event_date = (
-        group["eventdate"]
+        group["event_date"]
         .min()
         .rename("event_date")
     )
 
     raid_base = pd.concat([duration, n_players, event_date], axis=1).reset_index()
-    raid_base = raid_base.rename(columns={"raidid": "raid_id"})
+    raid_base = raid_base.rename(columns={"raid_id": "raid_id"})
 
     # 3.- Daño y Curación total
     damage = (
-        df[df["eventtype"] == "combat_damage"]
-        .groupby("raidid")["damageamount"]
+        df[df["event_type"] == "combat_damage"]
+        .groupby("raid_id")["damage_amount"]
         .sum()
         .rename("total_damage")
     )
 
     healing = (
-        df[df["eventtype"] == "heal"]
-        .groupby("raidid")["healingamount"]
+        df[df["event_type"] == "heal"]
+        .groupby("raid_id")["healing_amount"]
         .sum()
         .rename("total_healing")
     )
 
     deaths = (
-        df[df["eventtype"] == "player_death"]
-        .groupby("raidid")["eventtype"]
+        df[df["event_type"] == "player_death"]
+        .groupby("raid_id")["event_type"]
         .count()
         .rename("total_player_deaths")
     )
@@ -115,9 +115,8 @@ def build_raid_summary(df_silver: pd.DataFrame) -> pd.DataFrame:
     raid_base = raid_base.merge(
         role_counts,
         how="left",
-        left_on="raid_id",
-        right_on="raidid",
-    ).drop(columns=["raidid"])
+        on="raid_id",   # con on= en lugar de left_on/right_on evitas duplicados sin necesidad de drop
+    )
 
     # Asegurar tipo entero
     raid_base["n_tanks"] = raid_base["n_tanks"].astype("int64")
@@ -131,11 +130,11 @@ def build_raid_summary(df_silver: pd.DataFrame) -> pd.DataFrame:
     raid_base["total_player_deaths"] = raid_base["total_player_deaths"].fillna(0).astype("int64")
 
     # 4.- boss_min_hp_pct
-    boss_events = df[df["targetentitytype"] == "boss"]
+    boss_events = df[df["target_entity_type"] == "boss"]
 
     boss_min = (
         boss_events
-        .groupby("raidid")["targetentityhealthpctafter"]
+        .groupby("raid_id")["target_entity_health_pct_after"]
         .min()
         .rename("boss_min_hp_pct")
     )
@@ -229,73 +228,73 @@ def build_player_raid_stats(
     df = df_silver.copy()
     
     # 2. Agrupar por raid + jugador para agregados básicos
-    group = df.groupby(["raidid", "sourceplayerid"])
+    group = df.groupby(["raid_id", "source_player_id"])
     
     # Daño total por jugador
     damage_per_player = (
-        df[df["eventtype"] == "combat_damage"]
-        .groupby(["raidid", "sourceplayerid"])["damageamount"]
+        df[df["event_type"] == "combat_damage"]
+        .groupby(["raid_id", "source_player_id"])["damage_amount"]
         .sum()
         .rename("damage_total")
     )
 
     # Contar eventos de daño y curación
     damage_events = (
-        df[df["eventtype"] == "combat_damage"]
-        .groupby(["raidid", "sourceplayerid"])["eventtype"]
+        df[df["event_type"] == "combat_damage"]
+        .groupby(["raid_id", "source_player_id"])["event_type"]
         .count()
         .rename("damage_events")
     )
     
     # Curación total por jugador
     healing_per_player = (
-        df[df["eventtype"] == "heal"]
-        .groupby(["raidid", "sourceplayerid"])["healingamount"]
+        df[df["event_type"] == "heal"]
+        .groupby(["raid_id", "source_player_id"])["healing_amount"]
         .sum()
         .rename("healing_total")
     )
 
     healing_events = (
-        df[df["eventtype"] == "heal"]
-        .groupby(["raidid", "sourceplayerid"])["eventtype"]
+        df[df["event_type"] == "heal"]
+        .groupby(["raid_id", "source_player_id"])["event_type"]
         .count()
         .rename("healing_events")
     )
     
     # Muertes del jugador (cuando el jugador es TARGET de player_death)
     # Cuidado: en eventos de muerte, el target es el muerto, no el source
-    # Ajusta según tu schema: si usas targetentityid para el muerto,
-    # agrupa por (raidid, targetentityid). Si tu schema usa sourceplayerid
-    # como el que muere, usa sourceplayerid.
+    # Ajusta según tu schema: si usas target_entity_id para el muerto,
+    # agrupa por (raid_id, target_entity_id). Si tu schema usa source_player_id
+    # como el que muere, usa source_player_id.
     
-    # Supongo que en tu schema el muerto es sourceplayerid en eventtype player_death
+    # Supongo que en tu schema el muerto es source_player_id en event_type player_death
     player_deaths = (
-        df[df["eventtype"] == "player_death"]
-        .groupby(["raidid", "sourceplayerid"])["eventtype"]
+        df[df["event_type"] == "player_death"]
+        .groupby(["raid_id", "source_player_id"])["event_type"]
         .count()
         .rename("player_deaths")
     )
     
     # 3. Metadatos del jugador (name, class, role) - tomar primer valor
     player_meta = (
-        df.groupby(["raidid", "sourceplayerid"])
+        df.groupby(["raid_id", "source_player_id"])
         .agg({
-            "sourceplayername": "first",
-            "sourceplayerclass": "first",
-            "sourceplayerrole": "first",
+            "source_player_name": "first",
+            "source_player_class": "first",
+            "source_player_role": "first",
         })
         .rename(columns={
-            "sourceplayername": "player_name",
-            "sourceplayerclass": "player_class",
-            "sourceplayerrole": "player_role",
+            "source_player_name": "player_name",
+            "source_player_class": "player_class",
+            "source_player_role": "player_role",
         })
     )
     
     # 4. Construir base
     player_base = player_meta.copy()
     player_base = player_base.reset_index().rename(columns={
-        "raidid": "raid_id",
-        "sourceplayerid": "player_id",
+        "raid_id": "raid_id",
+        "source_player_id": "player_id",
     })
     
     # 5. Añadir damage, healing, deaths
@@ -332,10 +331,10 @@ def build_player_raid_stats(
     player_base["dps"] = player_base["dps"].fillna(0.0)
     player_base["hps"] = player_base["hps"].fillna(0.0)
 
-    # 8. Contar eventos críticos (iscriticalhit == True)
+    # 8. Contar eventos críticos (is_critical_hit == True)
     crit_events = (
-        df[(df["eventtype"].isin(["combat_damage", "heal"])) & (df["iscriticalhit"] == True)]
-        .groupby(["raidid", "sourceplayerid"])["eventtype"]
+        df[(df["event_type"].isin(["combat_damage", "heal"])) & (df["is_critical_hit"] == True)]
+        .groupby(["raid_id", "source_player_id"])["event_type"]
         .count()
         .rename("crit_events")
     )
@@ -355,13 +354,13 @@ def build_player_raid_stats(
     )
 
     damage_received = (
-        df[df["eventtype"] == "combat_damage"]
-        .groupby(["raidid", "targetentityid"])["damageamount"]
+        df[df["event_type"] == "combat_damage"]
+        .groupby(["raid_id", "target_entity_id"])["damage_amount"]
         .sum()
         .rename("total_damage_received")
     )
 
-    # Merge usando targetentityid = player_id
+    # Merge usando target_entity_id = player_id
     player_base = player_base.merge(
         damage_received,
         how="left",

@@ -12,6 +12,8 @@ _jar_default = (
     str(Path.home() / "spark-jars" / "hadoop-aws-3.3.4.jar")
     + ","
     + str(Path.home() / "spark-jars" / "aws-java-sdk-bundle-1.12.262.jar")
+    + ","
+    + str(Path.home() / "spark-jars" / "iceberg-spark-runtime-3.5_2.12-1.7.1.jar")
 )
 
 SPARK_JARS = os.getenv("SPARK_JARS_PATH", _jar_default)
@@ -27,7 +29,22 @@ def get_spark_session(app_name: str = "WoWRaidTelemetry") -> SparkSession:
         SparkSession.builder
         .master("local[*]")               # usa todos los cores del TUF
         .appName(app_name)
-        .config("spark.jars", SPARK_JARS) # los dos JARs que descargaste
+        .config("spark.jars", SPARK_JARS) # los JARs que descargaste
+
+        # ── Iceberg: carga en classloader del driver ──────────────────
+        .config(
+            "spark.driver.extraClassPath",
+            str(Path.home() / "spark-jars" / "iceberg-spark-runtime-3.5_2.12-1.7.1.jar")
+        )
+
+        # ── Iceberg catalog ───────────────────────────────────────────
+        .config(
+            "spark.sql.extensions",
+            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+        )
+        .config("spark.sql.catalog.wow",             "org.apache.iceberg.spark.SparkCatalog")
+        .config("spark.sql.catalog.wow.type",        "hadoop")
+        .config("spark.sql.catalog.wow.warehouse",   "s3a://warehouse/")
 
         # Memoria del driver — conservador para laptop
         .config("spark.driver.memory", "2g")

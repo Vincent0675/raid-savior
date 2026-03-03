@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from src.api.receiver import create_app
+from src.generators.raid_event_generator import WoWEventGenerator
 
 
 @pytest.fixture
@@ -22,16 +23,14 @@ def client():
 
 @pytest.fixture
 def sample_events():
-    """Load sample events from generated dataset."""
-    dataset_path = Path("data/bronze/datos_generados.json")
-    
-    if not dataset_path.exists():
-        pytest.skip("Dataset not found. Run scripts/generate_dataset.py first.")
-    
-    with open(dataset_path, 'r') as f:
-        events = json.load(f)
-    
-    return events[:10]  # Use first 10 events
+    generator = WoWEventGenerator(seed=42)
+    session = generator.generate_raid_session(
+        raid_id="raid999",
+        num_players=5,
+        duration_s=30,
+    )
+    events = generator.generate_events(session, num_events=10)
+    return [e.model_dump(mode="json") for e in events]
 
 
 def test_health_check(client):
@@ -52,7 +51,7 @@ def test_post_valid_events(client, sample_events):
         content_type='application/json'
     )
     
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.get_json()
     assert data['status'] == 'accepted'
     assert data['events_received'] == len(sample_events)

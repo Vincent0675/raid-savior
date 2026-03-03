@@ -49,6 +49,30 @@ class SilverTransformer:
         for col in string_cols:
             if col in df.columns:
                 df[col] = df[col].astype('string')
+
+        # 4. Enteros (Magnitudes discretas)
+        # Int64 (mayúscula) = nulleable integer de pandas, soporta NaN sin romper el tipo
+        integer_cols = [
+            'source_player_level',     # nivel 1-90, SIEMPRE entero
+            'server_latency_ms',
+            'client_latency_ms',
+            'encounter_duration_ms',
+        ]
+        for col in integer_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
+        
+        # 5. Arrays de flags (Señal digital paquetizada)
+        # Garantiza que data_quality_flags es SIEMPRE list[int],
+        # independientemente de si el generador produjo strings o ints
+        if 'data_quality_flags' in df.columns:
+            def normalize_flags(val):
+                if isinstance(val, list):
+                    return [str(f) for f in val if f is not None]
+                if val is None or (isinstance(val, float) and pd.isna(val)):
+                    return []
+                return []
+            df['data_quality_flags'] = df['data_quality_flags'].apply(normalize_flags)
         
         return df
 
