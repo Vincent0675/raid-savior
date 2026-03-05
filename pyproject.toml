@@ -1,0 +1,59 @@
+# ============================================================
+# pyproject.toml — WoW Raid Telemetry Pipeline
+# Estándar moderno PEP 517/518/621 (reemplaza setup.py)
+# ============================================================
+
+[build-system]
+# Le dice a pip qué herramienta usar para construir el paquete
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# ------------------------------------------------------------
+# Metadatos del proyecto (equivale a setup() en setup.py)
+# ------------------------------------------------------------
+[project]
+name = "wow-telemetry-pipeline"
+version = "0.1.0"
+description = "Event-driven telemetry pipeline for WoW raids with Medallion architecture"
+requires-python = ">=3.10"
+
+# Equivale a author= y author_email= de setup()
+authors = [
+    { name = "Varegotch", email = "byronblatch@gmail.com" }
+]
+
+# Equivale a install_requires=[...] — solo dependencias de producción mínimas
+# (pyspark, boto3, etc. se instalan por requirements.txt, no aquí)
+dependencies = [
+    "pydantic>=2.10.4",
+    "numpy>=1.26.4",
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+# ------------------------------------------------------------
+# Equivale a extras_require={"dev": [...]} de setup()
+# Uso: pip install -e ".[dev]"
+# ------------------------------------------------------------
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "black>=24.1.0",
+    "ruff>=0.1.15",
+    "mypy>=1.8.0",
+]
+
+# ------------------------------------------------------------
+# Configuración de setuptools: descubrimiento de paquetes
+# Equivale a find_packages(where=".") de setup()
+# ------------------------------------------------------------
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+exclude = ["scripts*", "tests*", "notebooks*", "data*", "docs*", "infra*", "legacy*"]

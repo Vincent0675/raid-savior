@@ -1,19 +1,9 @@
-#!/usr/bin/env python3
 """
 Orquestador ETL: Bronze → Silver
 Lee TODOS los archivos JSON de Bronze, transforma a Parquet y escribe en Silver.
-
-Uso:
-    python scripts/run_bronze_to_silver.py
 """
 
-import sys
-import os
-from pathlib import Path
 from tqdm import tqdm
-
-# Asegurar que Python encuentra los módulos
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.etl.bronze_to_silver import BronzeToSilverETL
 from src.storage.minio_client import MinIOStorageClient

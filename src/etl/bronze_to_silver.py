@@ -6,10 +6,9 @@ Soporta dos formatos de entrada:
 1. Envelope (HTTP): {"batch_id": "...", "events": [...]}
 2. Array directo (S3): [...]
 
-v2. Bug arreglado en la transformación y carga de los batches que se encuentran en Bronze.
+v2.1: Resolución de timestamps en microsegundos para compatibilidad nativa con Spark/Delta (Fase 7)
 """
 
-import sys
 import os
 import json
 import pandas as pd
@@ -18,12 +17,8 @@ from typing import Dict, Tuple
 from datetime import datetime, timezone
 import io
 
-# Aseguramos que Python encuentre nuestros módulos
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
 from src.storage.minio_client import MinIOStorageClient
 from src.etl.transformers import SilverTransformer
-
 
 class BronzeToSilverETL:
     def __init__(self):
@@ -54,14 +49,14 @@ class BronzeToSilverETL:
 
         # Obtenemos la fecha para la partición Hive-style
         event_date = df['event_date'].iloc[0] if 'event_date' in df.columns else "unknown"
-        
+
         # Construimos la ruta destino (Key)
         s3_key = f"wow_raid_events/v1/raid_id={raid_id}/event_date={event_date}/part-{batch_id}.parquet"
-        
+
         # --- CORRECCIÓN: Prevenir conflicto de particiones ---
         # Hacemos una copia para no afectar al DataFrame original en memoria
         df_to_save = df.copy()
-        
+
         # Eliminamos las columnas que YA están en la ruta de carpetas (partition keys)
         # para que PyArrow no se confunda al leer.
         cols_to_drop = []
@@ -69,24 +64,30 @@ class BronzeToSilverETL:
             cols_to_drop.append('raid_id')
         if 'event_date' in df_to_save.columns:
             cols_to_drop.append('event_date')
-            
+
         if cols_to_drop:
             df_to_save = df_to_save.drop(columns=cols_to_drop)
-        
+
         try:
             # 1. Serializar a Buffer en memoria (usando df_to_save)
             out_buffer = io.BytesIO()
+            
+            # ---> FIX PARA SPARK (FASE 7) <---
+            # Forzamos los timestamps de datetime64[ns] (Pandas) a TIMESTAMP(unit=MICROS)
+            # para que Spark los interprete nativamente como TimestampType y no como LongType.
             df_to_save.to_parquet(
                 out_buffer,
                 index=False,
                 engine='pyarrow',
-                compression='snappy'
+                compression='snappy',
+                coerce_timestamps='us',          # Baja la resolución a microsegundos
+                allow_truncated_timestamps=True  # Permite el truncamiento sin lanzar excepción
             )
-            
+
             # 2. Subir a MinIO
             out_buffer.seek(0)
             data_len = out_buffer.getbuffer().nbytes
-            
+
             self.storage.put_object(
                 bucket_name=self.bucket_silver,
                 object_name=s3_key,
@@ -94,13 +95,14 @@ class BronzeToSilverETL:
                 length=data_len,
                 content_type="application/octet-stream"
             )
+
             return {
                 "status": "success",
                 "s3_path": f"s3://{self.bucket_silver}/{s3_key}",
                 "rows": len(df),
                 "bytes": data_len
             }
-            
+
         except Exception as e:
             raise IOError(f"Error escribiendo Silver: {e}")
 

@@ -3,12 +3,9 @@
 Diagnóstico quirúrgico del pipeline Bronze → Silver → Gold.
 Identifica exactamente dónde se pierde el dato de producción.
 """
-import sys, io, json, re
-from pathlib import Path
-import boto3
+import io, json
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.storage.minio_client import MinIOStorageClient
 
 s3 = MinIOStorageClient().s3

@@ -17,11 +17,10 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import (
     StructType, StructField,
     StringType, LongType, DoubleType, BooleanType,
-    ArrayType, DateType
+    ArrayType
 )
 
 from src.etl.spark_session import get_spark_session, stop_spark_session
-from src.config import Config
 
 logger = logging.getLogger(__name__)
 

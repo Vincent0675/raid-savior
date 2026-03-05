@@ -45,7 +45,7 @@ def main():
     print()
     
     # Prepare output
-    out_path = Path("schemas/eventos_schema.json")
+    out_path = Path("docs/schemas/eventos_schema.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Write JSON Schema

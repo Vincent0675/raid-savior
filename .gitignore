@@ -31,6 +31,8 @@ env/
 # Conda/Mamba
 .conda/
 .mamba/
+.micromamba/
+.microconda3/
 
 # IDEs
 .vscode/

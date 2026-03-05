@@ -3,13 +3,10 @@ Script de Inspección: Bronze vs Silver
 Visualiza las transformaciones aplicadas en el ETL.
 """
 
-import sys
 import os
 import json
 import pandas as pd
 from datetime import datetime
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.storage.minio_client import MinIOStorageClient
 

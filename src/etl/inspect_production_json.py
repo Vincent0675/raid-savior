@@ -16,7 +16,7 @@ Maneja dos formatos de JSON:
 
 import json
 from pathlib import Path
-from collections import Counter, defaultdict
+from collections import Counter
 
 # ─── CONFIGURA ESTE PATH ────────────────────────────────────────────────────
 BRONZE_ROOT = Path("data/bronze/production")   # ← ajusta si tu carpeta tiene otro nombre
