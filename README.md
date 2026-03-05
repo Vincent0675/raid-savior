@@ -4,8 +4,8 @@
 **Autor:** Byron V. Blatch Rodriguez   
 **Profesor:** Francisco Javier Ortega   
 **Repositorio:** [github.com/Vincent0675/raid-savior](https://github.com/Vincent0675/raid-savior)   
-**Estado:** Fase 4 (Gold) completada. Fase E (PySpark) completada.   
-**Última actualización:** 28 de febrero de 2026.   
+**Estado:** Fase 7, implementación ACID mediante Apache Iceberg (en progreso)   
+**Última actualización:** 5 de marzo de 2026.   
 
 ***
 
@@ -44,8 +44,9 @@ y formato columnar Parquet en Silver/Gold.
 | 2 — Ingesta HTTP | Flask · MinIO · Docker | ✅ Completada |
 | 3 — ETL Bronze→Silver | Pandas · PyArrow · Parquet | ✅ Completada |
 | 4 — ETL Silver→Gold (Pandas) | DuckDB · Pydantic v2 | ✅ Completada |
-| E — ETL Silver→Gold (Spark) | PySpark 3.5 · S3A · MinIO | ✅ Completada |
-| F — Orquestación | Dagster | 🔄 En progreso |
+| 5 — ETL Silver→Gold (Spark) | PySpark 3.5 · S3A · MinIO | ✅ Completada |
+| 6 — Orquestación | Dagster | ✅ Completada |
+| 7 — Integración ACID | Apache Iceberg | 🔄 En progreso |
 
 ### Rendimiento Spark (entorno local)
 
@@ -229,26 +230,50 @@ En analogía electrónica, la validación en Bronze equivale a poner un **filtro
 
 ### Requisitos previos
 
+#### 1. Crear el entorno de trabajo
 ```bash
-# 1. Levantar MinIO
-cd infra/minio && docker compose up -d
-
-# 2. Activar entorno
+mamba env create -f environment.yml
+# O con conda
+conda env create -f environment.yml
+```
+#### 2. Activar el entorno
+```bash
 mamba activate wow-telemetry
 ```
-
-
-### Paso 1 — Ingestar en Bronze (dataset de producción local)
-
+#### 3. Descargar los JARS de Spark (SOLO UNA VEZ)
 ```bash
-# Dry-run (verificar rutas sin subir)
-python src/etl/ingest_bronze_production.py --dry-run
-
-# Ingesta real
-python src/etl/ingest_bronze_production.py
-# Esperado: ✅ Subidos: 1010 archivos | 📦 546.9 MB
+chmod +x scripts/download_spark_jars.sh
+./scripts/download_spark_jars.sh
 ```
 
+#### 3. Levantar MinIO
+```bash
+cd infra/minio && docker compose up -d
+```
+#### 4. Ingresar a http://localhost:9001/, introducir las credenciales (`minio` | `minio123` por predeterminado) y crear los Buckets "bronze", "silver" y "gold".
+
+#### 5. En otra terminal con ubicación en la raíz del proyecto, levantar el Receptor HTTP
+```bash
+python src/api/receiver.py
+```
+
+#### 6. Abrir `tests/cliente_sse.html` en un navegador y abrir la consola JS donde se mostrarán los eventos que se van ingestando.
+***
+
+## 7. Ingesta Principal — Receptor HTTP en tiempo real
+
+Para el flujo event-driven original (Flask + generador HTTP + SSE):
+
+### Paso 1 — Ingesta a Bronze
+
+```bash
+# Generador masivo
+python src/generators/generate_massive_http.py \
+  --num-raids 5 \
+  --num-events-per-raid 50000 \
+  --batch-size 500
+```
+#### Si vamos a la web UI de MinIO y nos dirigimos al Bucket "bronze" observaremos que los datos fueron ingestados correctamente.
 
 ### Paso 2 — ETL Bronze → Silver
 
@@ -286,28 +311,6 @@ python -m src.analytics.inspect_gold --raid-id raid001 --event-date 2026-02-25
 pytest tests/ -q
 ```
 
-
-***
-
-## 6. Ingesta alternativa — Receptor HTTP en tiempo real
-
-Para el flujo event-driven original (Flask + generador HTTP + SSE):
-
-```bash
-# Terminal 1 — Receptor HTTP
-python src/api/receiver.py
-
-# Terminal 2 — Generador masivo
-python src/generators/generate_massive_http.py \
-  --num-raids 5 \
-  --num-events-per-raid 50000 \
-  --batch-size 500
-
-# Monitorización SSE en tiempo real
-# Abrir: tests/cliente_sse.html en el navegador
-```
-
-
 ***
 
 ## 7. Estado del proyecto
@@ -325,11 +328,11 @@ python src/generators/generate_massive_http.py \
 
 | Fase | Descripción | Tecnología prevista |
 | :-- | :-- | :-- |
-| **E** | Procesamiento distribuido sobre Gold | PySpark + DuckDB + S3A → MinIO |
-| **F** | Table format + orquestación | Delta Lake + Dagster |
-| **G** | Visualización y APIs | Grafana + Apache Superset + FastAPI |
-| **H** | Modelado IA | MLflow + PyCaret + CuDF (RTX 3050) |
-| **I** | Datos reales | Warcraft Logs API |
+| **5** | Procesamiento distribuido sobre Gold | PySpark + DuckDB + S3A → MinIO |
+| **6** | Table format + orquestación | Delta Lake + Dagster |
+| **7** | Visualización y APIs | Grafana + Apache Superset + FastAPI |
+| **8** | Modelado IA | MLflow + PyCaret + CuDF (RTX 3050) |
+| **9** | Datos reales | Warcraft Logs API |
 
 
 ***
@@ -361,7 +364,7 @@ python src/generators/generate_massive_http.py \
 | Contenedores | Docker, Docker Compose |
 | Testing | pytest |
 
-### Planificado (Fases E–I)
+### Planificado (Fases 5–10)
 
 | Capa | Tecnología |
 | :-- | :-- |
@@ -375,43 +378,5 @@ python src/generators/generate_massive_http.py \
 
 ***
 
-## 10. Reproducción del entorno
-
-```bash
-# Clonar
-git clone https://github.com/Vincent0675/raid-savior.git
-cd raid-savior
-
-# Entorno
-mamba create -n wow-telemetry python=3.10
-mamba activate wow-telemetry
-pip install -r requirements.txt
-
-# Descargar JARs de Spark (una sola vez)
-chmod +x scripts/download_spark_jars.sh
-./scripts/download_spark_jars.sh
-
-# Variables de entorno (.env)
-S3_ENDPOINT_URL=http://localhost:9000
-S3_ACCESS_KEY=minio
-S3_SECRET_KEY=minio123
-S3_BUCKET_BRONZE=bronze
-S3_BUCKET_SILVER=silver
-S3_BUCKET_GOLD=gold
-FLASK_HOST=0.0.0.0
-FLASK_PORT=5000
-
-# Infraestructura
-cd infra/minio && docker compose up -d
-```
-
 **Hardware de desarrollo:**
 ASUS TUF Gaming A15 · RTX 3050 4GB (CUDA) · Pop!_OS 22.04 · 16 GB RAM
-
-***
-
-## 11. Autoría
-
-**Autor:** Byron V. Blatch Rodriguez — Estudiante Big Data e IA   
-**GitHub:** [@Vincent0675](https://github.com/Vincent0675)   
-**Profesor:** Francisco Javier Ortega   
