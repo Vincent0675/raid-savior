@@ -265,17 +265,20 @@ cd infra/minio && docker compose up -d
 ```
 #### 4. Ingresar a http://localhost:9001/, introducir las credenciales (`minio` | `minio123` por predeterminado) y crear los Buckets "bronze", "silver" y "gold".
 
-#### 5. En otra terminal con ubicación en la raíz del proyecto, levantar el Receptor HTTP
-```bash
-python src/api/receiver.py
-```
-
-#### 6. Abrir `tests/cliente_sse.html` en un navegador y abrir la consola JS donde se mostrarán los eventos que se van ingestando.
 ***
 
 ## 7. Ingesta Principal — Receptor HTTP en tiempo real
 
 Para el flujo event-driven original (Flask + generador HTTP + SSE):
+
+### Paso 0 — Levantar Flask y abrir cliente SSE
+
+En una terminal aparte en raíz de proyecto
+```bash
+python src/api/receiver.py
+```
+
+> Abrir `tests/cliente_sse.html` en un navegador y abrir la consola JS donde se mostrarán los eventos.
 
 ### Paso 1 — Ingesta a Bronze
 
