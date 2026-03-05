@@ -77,7 +77,7 @@ def _validate_dataframe(df: pd.DataFrame, schema: Type[BaseModel], table_name: s
 
     for idx, row in df.iterrows():
         try:
-            schema(**row.to_dict())
+            schema.model_validate(row.to_dict())
         except ValidationError as exc:
             errors.append(f"  Fila {idx}: {exc.error_count()} error(s) → {exc.errors(include_url=False)}")
 

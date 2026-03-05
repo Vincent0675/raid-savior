@@ -332,11 +332,12 @@ class WoWEventGenerator:
         events: List[WoWRaidEvent] = []
         for ts in timestamps:
             timestamp = datetime.fromtimestamp(float(ts), tz=timezone.utc)
-            
+            player = self._pick_player(session) 
+
             if self._rng.random() < 0.70:
-                ev = self._create_damage_event(session, timestamp, dummy_phase)
+                ev = self._create_damage_event(player, session, timestamp, dummy_phase)
             else:
-                ev = self._create_heal_event(session, timestamp, dummy_phase)
+                ev = self._create_heal_event(player, session, timestamp, dummy_phase)
             
             events.append(ev)
         
@@ -419,8 +420,8 @@ class WoWEventGenerator:
             encounter_duration_ms=encounter_duration_ms,
             source_player_id=source.player_id,
             source_player_name=source.name,
-            source_player_role=source.role,
-            source_player_class=source.player_class,
+            source_player_role=PlayerRole(player.role),
+            source_player_class=PlayerClass(player.player_class),
             source_player_level=source.level,
             target_entity_id=session.boss_id,
             target_entity_name=session.boss_name,
@@ -473,8 +474,8 @@ class WoWEventGenerator:
             encounter_duration_ms=encounter_duration_ms,
             source_player_id=healer.player_id,
             source_player_name=healer.name,
-            source_player_role=healer.role,
-            source_player_class=healer.player_class,
+            source_player_role=PlayerRole(player.role),
+            source_player_class=PlayerClass(player.player_class),
             source_player_level=healer.level,
             target_entity_id=target.player_id,
             target_entity_name=target.name,
@@ -521,8 +522,8 @@ class WoWEventGenerator:
             encounter_duration_ms=encounter_duration_ms,
             source_player_id=caster.player_id,
             source_player_name=caster.name,
-            source_player_role=caster.role,
-            source_player_class=caster.player_class,
+            source_player_role=PlayerRole(player.role),
+            source_player_class=PlayerClass(player.player_class),
             source_player_level=caster.level,
             target_entity_id=session.boss_id,
             target_entity_name=session.boss_name,
@@ -568,8 +569,8 @@ class WoWEventGenerator:
             encounter_duration_ms=encounter_duration_ms,
             source_player_id=caster.player_id,
             source_player_name=caster.name,
-            source_player_role=caster.role,
-            source_player_class=caster.player_class,
+            source_player_role=PlayerRole(player.role),
+            source_player_class=PlayerClass(player.player_class),
             source_player_level=caster.level,
             target_entity_id=caster.player_id,
             target_entity_name=caster.name,
@@ -628,7 +629,7 @@ class WoWEventGenerator:
             target_entity_health_pct_after=0.0,
             ability_id=boss_ability["ability_id"],
             ability_name=boss_ability["ability_name"],
-            ability_school=boss_ability["ability_school"],
+            ability_school=DamageSchool(boss_ability["ability_school"]),
             damage_amount=None,
             healing_amount=None,
             is_critical_hit=False,
