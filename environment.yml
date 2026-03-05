@@ -44,4 +44,3 @@ dependencies:
     - pytest-cov==4.1.0
     - ruff==0.1.15
     - tzdata==2025.2
-    - wow-telemetry-pipeline==0.1.0

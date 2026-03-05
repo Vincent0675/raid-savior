@@ -233,13 +233,26 @@ En analogía electrónica, la validación en Bronze equivale a poner un **filtro
 #### 1. Crear el entorno de trabajo
 ```bash
 mamba env create -f environment.yml
-# O con conda
+```
+> Puede usarse también conda
+```bash
 conda env create -f environment.yml
 ```
+
 #### 2. Activar el entorno
 ```bash
 mamba activate wow-telemetry
 ```
+#### 3. Instalar paquetes del proyecto
+> Paquetes sin herramientas de desarrollo
+```bash
+pip install -e .
+```
+> Paquetes con herramientas de desarrollo
+```bash
+pip install -e .[dev]
+```
+
 #### 3. Descargar los JARS de Spark (SOLO UNA VEZ)
 ```bash
 chmod +x scripts/download_spark_jars.sh
