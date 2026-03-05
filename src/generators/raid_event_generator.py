@@ -172,7 +172,7 @@ class WoWEventGenerator:
 
             # Paso 3: construir Player — role/dps_type/resource_type se derivan en __post_init__
             players.append(Player(
-                player_id=f"player_{uuid.uuid4().hex[:8]}",
+                player_id=f"player_{raid_id}_{i+1:03d}",
                 name=f"Player_{i:02d}",
                 player_class=player_class,
                 spec=spec_name,

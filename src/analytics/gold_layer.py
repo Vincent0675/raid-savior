@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import io
 import logging
-from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Type
 
 import pandas as pd
@@ -175,7 +174,13 @@ class GoldLayerETL:
             )
 
         df_result = pd.concat(dfs, ignore_index=True)
+
+        # Reinyección de partition keys — Pandas no las infiere desde la ruta Hive-style
+        df_result["raid_id"] = raid_id
+        df_result["event_date"] = event_date
+
         logger.info("[Silver → Gold] Total filas leídas: %d", len(df_result))
+
         return df_result
 
     # ------------------------------------------------------------------ #
@@ -202,15 +207,15 @@ class GoldLayerETL:
 
         dim = (
             df_silver
-            .groupby("sourceplayerid", as_index=False)
+            .groupby("source_player_id", as_index=False)
             .agg(
-                player_name=("sourceplayername", "first"),
-                player_class=("sourceplayerclass", "first"),
-                player_role=("sourceplayerrole", "first"),
-                first_seen_date=("eventdate", "min"),
-                last_seen_date=("eventdate", "max"),
+                player_name=("source_player_name", "first"),
+                player_class=("source_player_class", "first"),
+                player_role=("source_player_role", "first"),
+                first_seen_date=("event_date", "min"),
+                last_seen_date=("event_date", "max"),
             )
-            .rename(columns={"sourceplayerid": "player_id"})
+            .rename(columns={"source_player_id": "player_id"})
         )
 
         # total_raids en Fase 4 = 1 por definición (procesamos 1 raid a la vez)
@@ -449,28 +454,9 @@ class GoldLayerETL:
             df_silver = self.read_silver_partition(raid_id, event_date)
 
             # ── 2. Normalizar nombres de columnas ─────────────────────────
-            # Los agregadores de Fase 3 trabajan con nombres sin guiones bajos.
-            # Mapeamos aquí para no modificar aggregators.py.
-            df_silver = df_silver.rename(columns={
-                "event_type":                    "eventtype",
-                "source_player_id":              "sourceplayerid",
-                "source_player_name":            "sourceplayername",
-                "source_player_class":           "sourceplayerclass",
-                "source_player_role":            "sourceplayerrole",
-                "damage_amount":                 "damageamount",
-                "healing_amount":                "healingamount",
-                "target_entity_type":            "targetentitytype",
-                "target_entity_id":              "targetentityid",
-                "target_entity_health_pct_after":"targetentityhealthpctafter",
-                "is_critical_hit":               "iscriticalhit",
-            })
 
-            df_silver = df_silver[df_silver["sourceplayerid"].str.startswith("player_")].copy()
-            logger.info("[Gold ETL] Eventos de jugadores reales tras filtro: %d", len(df_silver))
-
-            # Añadir columnas de partición como contexto explícito
-            df_silver["raidid"]    = raid_id
-            df_silver["eventdate"] = event_date
+            df_silver = df_silver[df_silver["source_player_id"].str.startswith("player_")].copy()
+            logger.info("[Gold ETL] Eventos de jugadores reales tras filtro: %d", len(df_silver))   
 
             logger.info("[Gold ETL] Silver leído: %d eventos.", len(df_silver))
 

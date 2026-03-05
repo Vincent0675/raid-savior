@@ -284,7 +284,7 @@ python src/api/receiver.py
 
 ```bash
 # Generador masivo
-python src/generators/generate_massive_http.py \
+python scripts/generators/generate_massive_http.py \
   --num-raids 5 \
   --num-events-per-raid 50000 \
   --batch-size 500
@@ -294,7 +294,7 @@ python src/generators/generate_massive_http.py \
 ### Paso 2 — ETL Bronze → Silver
 
 ```bash
-python src/etl/run_bronze_to_silver.py
+python scripts/etl/run_bronze_to_silver.py
 # Esperado: ✅ Exitosos: 1010 | 📊 Filas totales: 505.000
 ```
 
@@ -303,10 +303,10 @@ python src/etl/run_bronze_to_silver.py
 
 ```bash
 # Procesa TODAS las particiones disponibles en Silver automáticamente
-python -m src.etl.run_silver_to_gold --all
+python scripts/etl/run_silver_to_gold --all
 
 # Para re-procesar una partición concreta
-python -m src.etl.run_silver_to_gold --raid-id raid001 --event-date 2026-02-25
+python scripts/etl/run_silver_to_gold --raid-id raid001 --event-date 2026-02-25
 ```
 
 
@@ -314,17 +314,16 @@ python -m src.etl.run_silver_to_gold --raid-id raid001 --event-date 2026-02-25
 
 ```bash
 # Vista consolidada de todas las particiones + coherencia
-python -m src.analytics.inspect_gold --all
+python scripts/analytics/inspect_gold --all
 
 # Deep-dive en una partición concreta
-python -m src.analytics.inspect_gold --raid-id raid001 --event-date 2026-02-25
+python scripts/analytics/inspect_gold --raid-id raid001 --event-date 2026-02-25
 ```
-
 
 ### Paso 5 — Tests
 
 ```bash
-pytest tests/ -q
+python -m pytest
 ```
 
 ***
@@ -339,16 +338,18 @@ pytest tests/ -q
 | **2** | Receptor HTTP Flask + ingesta Bronze | ✅ Completa |
 | **3** | ETL Bronze → Silver (Parquet, Snappy, particionado Hive) | ✅ Completa |
 | **4** | Gold Medallion (dim_player, dim_raid, facts, validación) | ✅ Completa |
+| **5** | ETL Silver→Gold (Spark)  | ✅ Completa |
+| **6** | Orquestación mediante Dagster  | ✅ Completa |
+
 
 ### Roadmap
 
 | Fase | Descripción | Tecnología prevista |
 | :-- | :-- | :-- |
-| **5** | Procesamiento distribuido sobre Gold | PySpark + DuckDB + S3A → MinIO |
-| **6** | Table format + orquestación | Delta Lake + Dagster |
-| **7** | Visualización y APIs | Grafana + Apache Superset + FastAPI |
-| **8** | Modelado IA | MLflow + PyCaret + CuDF (RTX 3050) |
-| **9** | Datos reales | Warcraft Logs API |
+| **7** | Integración ACID | Apache Iceberg |
+| **8** | Visualización y APIs | Grafana + Apache Superset + FastAPI |
+| **9** | Modelado IA | MLflow + PyCaret + CuDF (RTX 3050) |
+| **10** | Datos reales | Warcraft Logs API |
 
 
 ***

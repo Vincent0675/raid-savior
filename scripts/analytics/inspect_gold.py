@@ -23,8 +23,6 @@ import sys
 
 import pandas as pd
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-
 from src.config import Config
 from src.storage.minio_client import MinIOStorageClient
 
