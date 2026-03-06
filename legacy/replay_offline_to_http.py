@@ -86,7 +86,7 @@ def main():
         total_events += eventcount or 0
 
         print(f"[OK] {i}/{len(batch_files)} status={status} "
-              f"batch_id={data.get('batchid')} eventcount={eventcount} path={path}")
+              f"batch_id={data.get('batchid')} eventcount={eventcount} path={path}") # type: ignore
 
     elapsed = time.time() - t0
     print(f"Total eventos reenviados: {total_events}")

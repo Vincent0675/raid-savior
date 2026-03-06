@@ -284,7 +284,7 @@ python scripts/api/receiver.py
 
 ```bash
 # Generador masivo
-python scripts/generators/generate_massive_http.py \
+python scripts/generators/replay_raids.py \
   --num-raids 5 \
   --num-events-per-raid 50000 \
   --batch-size 500
