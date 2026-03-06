@@ -21,11 +21,7 @@ import sys
 import argparse
 from pathlib import Path
 from datetime import datetime, timezone
-
 from tqdm import tqdm
-
-# ── Asegurar imports del proyecto ─────────────────────────────────────────
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.storage.minio_client import MinIOStorageClient
 

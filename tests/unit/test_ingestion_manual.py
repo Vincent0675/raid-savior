@@ -1,7 +1,6 @@
 import requests
 import uuid
 from datetime import datetime, timezone
-import json
 
 # Configuración
 URL = "http://localhost:5000/events"
@@ -42,13 +41,17 @@ def run_test():
     # 1. Preparar Payload (Batch)
     event = generate_dummy_event()
     payload = [event]
-    resp = requests.post(URL, json=payload, timeout=10)
     print(f"📡 Enviando evento a {URL}...")
     # print(json.dumps(payload, indent=2)) # Descomentar para debug
     
     try:
         # 2. Enviar POST
-        response = requests.post(URL, json=payload, headers={"Content-Type": "application/json"})
+        response = requests.post(
+            URL,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+            )
         
         # 3. Analizar Respuesta
         if response.status_code == 201:
@@ -62,7 +65,7 @@ def run_test():
             print(f"   Respuesta: {response.text}")
             
     except Exception as e:
-        print(f"\n🔥 EXCEPCIÓN: No se pudo conectar al servidor. ¿Está corriendo?")
+        print("\n🔥 EXCEPCIÓN: No se pudo conectar al servidor. ¿Está corriendo?")
         print(e)
 
 if __name__ == "__main__":

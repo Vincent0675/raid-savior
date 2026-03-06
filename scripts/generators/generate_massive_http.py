@@ -8,7 +8,7 @@ import json
 from typing import Sequence, Dict, Any
 import uuid
 
-from src.generators.raid_event_generator import WoWEventGenerator, RaidSession
+from src.generators.raid_event_generator import WoWEventGenerator, RaidSession, WoWRaidEvent
 
 def build_raid_events(
         generator: WoWEventGenerator,

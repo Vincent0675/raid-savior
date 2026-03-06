@@ -3,13 +3,8 @@ Script de Prueba FASE 3: ETL Bronze -> Silver
 Busca el primer batch real en Bronze y lo transforma.
 """
 
-import sys
 import os
-import json
 import pandas as pd
-
-# Añadimos la raíz del proyecto al path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.etl.bronze_to_silver import BronzeToSilverETL
 from src.storage.minio_client import MinIOStorageClient

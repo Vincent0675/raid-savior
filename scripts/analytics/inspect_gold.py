@@ -18,7 +18,6 @@ Version: 2.0 - Fase 4 (modelo semidimensional)
 
 import argparse
 import io
-import os
 import sys
 
 import pandas as pd
@@ -158,7 +157,7 @@ def inspect_dim_raid(
         print(f"  Ruta   : s3://{bucket}/{key}")
         print(f"  Tamano : {format_bytes(size)}")
 
-        print(f"\n  Datos del encuentro:")
+        print("\n  Datos del encuentro:")
         print(f"    Raid ID           : {row['raid_id']}")
         print(f"    Fecha             : {row['event_date']}")
         print(f"    Boss              : {row['boss_name']}")
@@ -199,7 +198,7 @@ def inspect_fact_raid_summary(
         dur_min = row["duration_ms"] / 60_000
         print(f"\n  Duracion real : {dur_seg:.1f} seg ({dur_min:.2f} min)")
 
-        print(f"\n  Metricas de combate:")
+        print("\n  Metricas de combate:")
         print(f"    Dano total     : {row['total_damage']:>15,.0f}")
         print(f"    Curacion total : {row['total_healing']:>15,.0f}")
         print(f"    Muertes        : {int(row['total_player_deaths'])}")
@@ -207,7 +206,7 @@ def inspect_fact_raid_summary(
         print(f"    HPS global     : {row['raid_hps']:>12,.1f}")
         print(f"    Boss HP minimo : {row['boss_min_hp_pct']:.2f}%")
 
-        print(f"\n  Composicion:")
+        print("\n  Composicion:")
         print(f"    Jugadores : {int(row['n_players'])}")
         print(f"    Tanks     : {int(row['n_tanks'])}")
         print(f"    Healers   : {int(row['n_healers'])}")
@@ -315,19 +314,32 @@ def inspect_partition_compact(
         df_summary  = _read_parquet(storage, bucket, key_summary)
         df_players  = _read_parquet(storage, bucket, key_players)
         df_dim_raid = _read_parquet(storage, bucket, key_dim_raid)
-        row = df_summary.iloc[0]
+
+        row_s = df_summary.iloc[0]
+        row_r = df_dim_raid.iloc[0]
+
+        fk_raid_ok = row_s["raid_id"] == row_r["raid_id"]
+        raid_size_ok = int(row_s["n_players"]) <= int(row_r["raid_size"])
+        damage_share_ok = abs(df_players["damage_share"].sum() - 1.0) < 0.01
+
 
         result.update({
-            "outcome":        row["raid_outcome"],
-            "total_damage":   row["total_damage"],
-            "total_healing":  row["total_healing"],
-            "raid_dps":       row["raid_dps"],
-            "raid_hps":       row["raid_hps"],
-            "deaths":         int(row["total_player_deaths"]),
-            "n_players":      int(row["n_players"]),
-            "boss_min_hp":    row["boss_min_hp_pct"],
-            # Coherencia rápida: damage_share suma ≈ 1.0
-            "coherence_ok":   abs(df_players["damage_share"].sum() - 1.0) < 0.01,
+            "boss_name": row_r["boss_name"],
+            "difficulty": row_r["difficulty"],
+            "raid_size": int(row_r["raid_size"]),
+            "duration_target_ms": int(row_r["duration_target_ms"]),
+            "outcome": row_s["raid_outcome"],
+            "total_damage": row_s["total_damage"],
+            "total_healing": row_s["total_healing"],
+            "raid_dps": row_s["raid_dps"],
+            "raid_hps": row_s["raid_hps"],
+            "deaths": int(row_s["total_player_deaths"]),
+            "n_players": int(row_s["n_players"]),
+            "boss_min_hp": row_s["boss_min_hp_pct"],
+            "fk_raid_ok": fk_raid_ok,
+            "raid_size_ok": raid_size_ok,
+            "damage_share_ok": damage_share_ok,
+            "coherence_ok": all([fk_raid_ok, raid_size_ok, damage_share_ok]),
         })
 
     except Exception as exc:
@@ -499,32 +511,53 @@ def inspect_all(
             rows.append(r)
 
     # Cabecera tabla
-    print(f"\n  {'raid_id':<10} {'date':<13} {'outcome':<9} "
-          f"{'total_dmg':>13} {'dps':>9} {'hps':>9} "
-          f"{'deaths':>7} {'players':>8} {'boss_hp%':>9}")
-    print(f"  {'─'*10} {'─'*13} {'─'*9} "
-          f"{'─'*13} {'─'*9} {'─'*9} "
-          f"{'─'*7} {'─'*8} {'─'*9}")
+    print(
+        f"\n {'raid_id':<10} {'date':<13} {'boss':<16} {'diff':<10} "
+        f"{'outcome':<10} {'total_dmg':>13} {'dps':>9} {'hps':>9} "
+        f"{'deaths':>7} {'players':>11} {'boss_hp%':>9}"
+    )
+    print(
+        f" {'─'*10} {'─'*13} {'─'*16} {'─'*10} "
+        f"{'─'*10} {'─'*13} {'─'*9} {'─'*9} "
+        f"{'─'*7} {'─'*11} {'─'*9}"
+    )
 
-    total_damage   = 0.0
-    total_healing  = 0.0
-    total_deaths   = 0
+    total_damage = 0.0
+    total_healing = 0.0
+    total_deaths = 0
     coherence_fails = 0
 
+    fk_raid_fails = 0
+    raid_size_fails = 0
+    damage_share_fails = 0
+
     for r in rows:
-        outcome_tag = "✅ SUCCESS" if r["outcome"] == "success" else "❌ WIPE   "
-        coh_tag     = "" if r["coherence_ok"] else " ⚠️"
+        outcome_tag = "✅ SUCCESS" if r["outcome"] == "success" else "❌ WIPE"
+        coh_tag = "" if r["coherence_ok"] else " ⚠️"
+
         if not r["coherence_ok"]:
             coherence_fails += 1
-        total_damage  += r["total_damage"]
+
+        if not r["fk_raid_ok"]:
+            fk_raid_fails += 1
+        if not r["raid_size_ok"]:
+            raid_size_fails += 1
+        if not r["damage_share_ok"]:
+            damage_share_fails += 1
+
+        total_damage += r["total_damage"]
         total_healing += r["total_healing"]
-        total_deaths  += r["deaths"]
+        total_deaths += r["deaths"]
+
+        players_tag = f"{r['n_players']}/{r['raid_size']}"
 
         print(
-            f"  {r['raid_id']:<10} {r['event_date']:<13} {outcome_tag:<9} "
-            f"  {r['total_damage']:>12,.0f} {r['raid_dps']:>9,.0f} "
-            f"{r['raid_hps']:>9,.0f} {r['deaths']:>7} "
-            f"{r['n_players']:>8} {r['boss_min_hp']:>8.1f}%{coh_tag}"
+            f" {r['raid_id']:<10} {r['event_date']:<13} "
+            f"{r['boss_name'][:16]:<16} {r['difficulty']:<10} "
+            f"{outcome_tag:<10} {r['total_damage']:>12,.0f} "
+            f"{r['raid_dps']:>9,.0f} {r['raid_hps']:>9,.0f} "
+            f"{r['deaths']:>7} {players_tag:>11} "
+            f"{r['boss_min_hp']:>8.1f}%{coh_tag}"
         )
 
     # ── 3. Totales globales ────────────────────────────────────────────────
@@ -575,6 +608,9 @@ def inspect_all(
     print(f"  Particiones inspeccionadas : {len(rows)}")
     print(f"  Errores de lectura         : {len(errors)}")
     print(f"  Coherencia fallida         : {coherence_fails}")
+    print(f" FK raid_id fallida : {fk_raid_fails}")
+    print(f" Raid size inconsistente : {raid_size_fails}")
+    print(f" damage_share fuera de tolerancia : {damage_share_fails}")
     print(f"  Daño total acumulado       : {total_damage:>20,.0f}")
     print(f"  Curación total acumulada   : {total_healing:>20,.0f}")
     print(f"  Muertes totales            : {total_deaths}")

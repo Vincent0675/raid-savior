@@ -1,5 +1,4 @@
 # tests/test_class_profiles.py
-import numpy as np
 from src.generators.class_profiles import SPEC_PROFILES, SPECS_BY_ROLE
 
 def test_known_role_assignments():

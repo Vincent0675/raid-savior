@@ -1,10 +1,8 @@
 import os
 import json
-import uuid
 import boto3
-from datetime import datetime
 from botocore.exceptions import ClientError
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 class MinIOStorageClient:
     """
@@ -65,9 +63,9 @@ class MinIOStorageClient:
             )
             return {"status": "success", "s3_path": f"s3://{self.bucket}/{key}"}
         
-        except ClientError as e:
+        except ClientError as err:
             # Aquí podrías loguear el error real
-            raise ConnectionError(f"Error escribiendo en MinIO: {e}")
+            raise ConnectionError(f"Error escribiendo en MinIO: {err}") from err
 
     # --- MÉTODOS AÑADIDOS PARA FASE 3 (Silver ETL) ---
 
@@ -79,8 +77,8 @@ class MinIOStorageClient:
         try:
             response = self.s3.get_object(Bucket=bucket_name, Key=object_name)
             return response['Body']
-        except ClientError as e:
-            raise FileNotFoundError(f"No se pudo leer {object_name} de {bucket_name}: {e}")
+        except ClientError as err:
+            raise FileNotFoundError(f"No se pudo leer {object_name} de {bucket_name}: {err}") from err
 
     def put_object(self, bucket_name: str, object_name: str, data: Any, length: int, content_type: str = "application/octet-stream"):
         """
@@ -94,8 +92,8 @@ class MinIOStorageClient:
                 ContentLength=length,
                 ContentType=content_type
             )
-        except ClientError as e:
-            raise ConnectionError(f"Error escribiendo {object_name} en {bucket_name}: {e}")
+        except ClientError as err:
+            raise ConnectionError(f"Error escribiendo {object_name} en {bucket_name}: {err}") from err
         
     def list_objects(self, bucket: str, prefix: str) -> list:
         """

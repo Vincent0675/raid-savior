@@ -11,6 +11,7 @@ build-backend = "setuptools.build_meta"
 # ------------------------------------------------------------
 # Metadatos del proyecto (equivale a setup() en setup.py)
 # ------------------------------------------------------------
+
 [project]
 name = "wow-telemetry-pipeline"
 version = "0.1.0"
@@ -18,12 +19,14 @@ description = "Event-driven telemetry pipeline for WoW raids with Medallion arch
 requires-python = ">=3.10"
 
 # Equivale a author= y author_email= de setup()
+
 authors = [
     { name = "Varegotch", email = "byronblatch@gmail.com" }
 ]
 
 # Equivale a install_requires=[...] — solo dependencias de producción mínimas
 # (pyspark, boto3, etc. se instalan por requirements.txt, no aquí)
+
 dependencies = [
     "pydantic>=2.10.4",
     "numpy>=1.26.4",
@@ -40,11 +43,11 @@ classifiers = [
 # Equivale a extras_require={"dev": [...]} de setup()
 # Uso: pip install -e ".[dev]"
 # ------------------------------------------------------------
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
-    "black>=24.1.0",
     "ruff>=0.1.15",
     "mypy>=1.8.0",
 ]
@@ -53,7 +56,44 @@ dev = [
 # Configuración de setuptools: descubrimiento de paquetes
 # Equivale a find_packages(where=".") de setup()
 # ------------------------------------------------------------
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
 exclude = ["scripts*", "tests*", "notebooks*", "data*", "docs*", "infra*", "legacy*"]
+
+# ------------------------------------------------------------
+#                 Configuración de Ruff
+# ------------------------------------------------------------
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+extend-exclude = ["data", "docs", "infra", "legacy"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+# ------------------------------------------------------------
+#                 Configuración de mypy
+# ------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+exclude = ["^legacy/", "^data/", "^docs/", "^infra/"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+check_untyped_defs = true
+pretty = true
+show_column_numbers = true
+show_error_code_links = true

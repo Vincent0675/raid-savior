@@ -1,4 +1,4 @@
-from src.generators.class_profiles import SPEC_PROFILES, SPECS_BY_ROLE
+from src.generators.class_profiles import SPEC_PROFILES
 from src.schemas.eventos_schema import EventType
 
 def test_player_roles_coherent_with_spec_profiles(session):

@@ -28,7 +28,6 @@ from src.schemas.eventos_schema import (
 
 from src.generators.class_profiles import SPEC_PROFILES
 from src.generators.class_profiles import SPECS_BY_ROLE, RAID_ROLE_WEIGHTS
-from src.schemas.eventos_schema import ResourceType
 
 
 @dataclass(frozen=True)

@@ -16,7 +16,7 @@ def find_batch_files(base_dir: str) -> List[str]:
       base_dir/raid002/batch_0001.json
     """
     batch_files = []
-    for root, dirs, files in os.walk(base_dir):
+    for root, _, files in os.walk(base_dir):
         for name in files:
             if name.startswith("batch_") and name.endswith(".json"):
                 batch_files.append(os.path.join(root, name))

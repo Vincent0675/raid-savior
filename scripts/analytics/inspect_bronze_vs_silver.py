@@ -63,7 +63,7 @@ def inspect_bronze_file(bronze_key):
     content = obj.read().decode('utf-8')
     data = json.loads(content)
     
-    print(f"\n📊 Estructura del Batch:")
+    print("\n📊 Estructura del Batch:")
     print(f"   - Batch ID: {data.get('batch_id')}")
     print(f"   - Timestamp de ingesta: {data.get('ingest_timestamp')}")
     print(f"   - Número de eventos: {data.get('event_count')}")
@@ -71,10 +71,10 @@ def inspect_bronze_file(bronze_key):
     # Convertir a DataFrame para análisis
     df_bronze = pd.DataFrame(data['events'])
     
-    print(f"\n🔍 Muestra de Datos Crudos (primeras 2 filas):")
+    print("\n🔍 Muestra de Datos Crudos (primeras 2 filas):")
     print(df_bronze[['event_id', 'event_type', 'timestamp', 'damage_amount', 'healing_amount']].head(2).to_string())
     
-    print(f"\n📋 Tipos de Datos en Bronze (JSON strings):")
+    print("\n📋 Tipos de Datos en Bronze (JSON strings):")
     for col in ['timestamp', 'damage_amount', 'raid_id', 'is_critical_hit']:
         if col in df_bronze.columns:
             sample_value = df_bronze[col].iloc[0]
@@ -111,19 +111,19 @@ def inspect_silver_file(batch_id, raid_id):
         parquet_bytes = io.BytesIO(obj.read())
         df_silver = pd.read_parquet(parquet_bytes)
         
-        print(f"\n📊 Estructura Transformada:")
+        print("\n📊 Estructura Transformada:")
         print(f"   - Filas: {len(df_silver)}")
         print(f"   - Columnas: {len(df_silver.columns)}")
-        print(f"   - Columnas nuevas (enriquecimiento): is_massive_hit, ingest_latency_ms")
+        print("   - Columnas nuevas (enriquecimiento): is_massive_hit, ingest_latency_ms")
         
-        print(f"\n📋 Tipos de Datos en Silver (optimizados):")
+        print("\n📋 Tipos de Datos en Silver (optimizados):")
         for col in ['timestamp', 'damage_amount', 'is_critical_hit', 'is_massive_hit']:
             if col in df_silver.columns:
                 dtype = df_silver[col].dtype
                 sample_value = df_silver[col].iloc[0]
                 print(f"   - {col}: {dtype} = {sample_value}")
         
-        print(f"\n🔍 Muestra de Datos Transformados (primeras 2 filas):")
+        print("\n🔍 Muestra de Datos Transformados (primeras 2 filas):")
         cols_to_show = ['event_id', 'event_type', 'timestamp', 'damage_amount', 'is_massive_hit']
         print(df_silver[cols_to_show].head(2).to_string())
         
@@ -141,21 +141,21 @@ def compare_layers(bronze_data, df_bronze, df_silver, bronze_size, silver_size):
     
     # 1. Compresión
     compression_ratio = (1 - silver_size / bronze_size) * 100
-    print(f"\n📦 Compresión:")
+    print("\n📦 Compresión:")
     print(f"   - Bronze (JSON): {format_bytes(bronze_size)}")
     print(f"   - Silver (Parquet): {format_bytes(silver_size)}")
     print(f"   - Reducción: {compression_ratio:.1f}%")
     
     # 2. Columnas añadidas
-    print(f"\n➕ Columnas Enriquecidas (no existen en Bronze):")
+    print("\n➕ Columnas Enriquecidas (no existen en Bronze):")
     new_cols = set(df_silver.columns) - set(df_bronze.columns)
     for col in sorted(new_cols):
         print(f"   - {col}")
     
     # 3. Conversión de tipos
-    print(f"\n🔄 Conversión de Tipos:")
-    print(f"   Bronze (JSON): Todo es string/object")
-    print(f"   Silver (Parquet):")
+    print("\n🔄 Conversión de Tipos:")
+    print("   Bronze (JSON): Todo es string/object")
+    print("   Silver (Parquet):")
     print(f"      - timestamp: {df_silver['timestamp'].dtype} (datetime con nanosegundos)")
     if 'damage_amount' in df_silver.columns:
         print(f"      - damage_amount: {df_silver['damage_amount'].dtype} (float nativo)")
@@ -165,16 +165,16 @@ def compare_layers(bronze_data, df_bronze, df_silver, bronze_size, silver_size):
     # 4. Ejemplo de enriquecimiento
     if 'is_massive_hit' in df_silver.columns:
         massive_hits = df_silver['is_massive_hit'].sum()
-        print(f"\n💥 Enriquecimiento - Massive Hits Detectados:")
+        print("\n💥 Enriquecimiento - Massive Hits Detectados:")
         print(f"   - Total de golpes masivos (>10k daño): {massive_hits}")
         print(f"   - Porcentaje: {(massive_hits/len(df_silver)*100):.1f}%")
     
     # 5. Particionamiento
-    print(f"\n📂 Particionamiento:")
-    print(f"   Bronze: /raidid=X/ingest_date=Y/")
-    print(f"   Silver: /raid_id=X/event_date=Y/ (optimizado para queries)")
-    print(f"   Ventaja: Las columnas raid_id y event_date ya NO están dentro del Parquet")
-    print(f"            (PyArrow las reconstruye desde la ruta = menos bytes por fila)")
+    print("\n📂 Particionamiento:")
+    print("   Bronze: /raidid=X/ingest_date=Y/")
+    print("   Silver: /raid_id=X/event_date=Y/ (optimizado para queries)")
+    print("   Ventaja: Las columnas raid_id y event_date ya NO están dentro del Parquet")
+    print("            (PyArrow las reconstruye desde la ruta = menos bytes por fila)")
 
 def main():
     print("\n" + "🔎 INSPECTOR DE TRANSFORMACIONES: BRONZE → SILVER" + "\n")

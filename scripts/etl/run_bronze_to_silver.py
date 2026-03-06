@@ -93,7 +93,7 @@ def main():
     
     # Mostrar muestra de archivos encontrados
     print()
-    print(f"📂 Archivos encontrados (muestra):")
+    print("📂 Archivos encontrados (muestra):")
     for i, f in enumerate(bronze_files[:5]):
         print(f"   {i+1}. {f}")
     if len(bronze_files) > 5:

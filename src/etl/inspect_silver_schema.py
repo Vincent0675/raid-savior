@@ -60,7 +60,7 @@ def main():
     print("\n── Schema canónico aplicado ──")
     df.printSchema()
 
-    print(f"\n── Total filas ──")
+    print("\n── Total filas ──")
     print(df.count())
 
     print("\n── Particiones (top 5) ──")

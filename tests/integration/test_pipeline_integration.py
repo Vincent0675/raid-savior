@@ -78,10 +78,6 @@ def test_fase_3_transformation(batch_id):
     # Esperar 2 segundos para asegurar que MinIO tiene el archivo
     time.sleep(2)
     
-    # Buscar el archivo en Bronze
-    storage = MinIOStorageClient()
-    bronze_bucket = os.getenv("S3_BUCKET_BRONZE", "bronze")
-    
     # Calcular la ruta esperada (mismo patrón que tu minio_client.calculate_object_key)
     ingest_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     bronze_key = f"wow_raid_events/v1/raidid={TEST_RAID_ID}/ingest_date={ingest_date}/batch_{batch_id}.json"
@@ -95,10 +91,10 @@ def test_fase_3_transformation(batch_id):
         result = etl.run(bronze_key)
         
         if result['status'] == 'success':
-            print(f"   ✅ Transformación exitosa")
+            print("   ✅ Transformación exitosa")
             print(f"      - Eventos procesados: {result['metadata']['rows_after_validation']}")
             print(f"      - Archivo Parquet: {result['storage']['s3_path']}")
-            assert 's3_path' is not None, "El ETL no devolvió s3_path"
+            assert 's3_path' != None, "El ETL no devolvió s3_path"
         else:
             print(f"   ⚠️ SKIPPED: {result.get('reason')}")
             return None
@@ -126,7 +122,7 @@ def test_fase_3_verification(s3_path):
         parquet_bytes = io.BytesIO(obj.read())
         df = pd.read_parquet(parquet_bytes)
         
-        print(f"   ✅ Parquet leído correctamente")
+        print("   ✅ Parquet leído correctamente")
         print(f"      - Filas: {len(df)}")
         print(f"      - Columnas: {len(df.columns)}")
         print(f"      - Columnas clave: {[c for c in ['event_id', 'timestamp', 'is_massive_hit'] if c in df.columns]}")
@@ -137,7 +133,7 @@ def test_fase_3_verification(s3_path):
         assert 'timestamp' in df.columns, "Falta columna timestamp"
         assert 'is_massive_hit' in df.columns, "Falta columna enriquecida is_massive_hit"
         
-        print(f"   ✅ Todas las validaciones pasaron")
+        print("   ✅ Todas las validaciones pasaron")
         
     except Exception as e:
         print(f"   ❌ ERROR en verificación: {e}")
@@ -177,11 +173,11 @@ def main():
         print("\n" + "="*70)
         print("✅ TEST COMPLETO: TODOS LOS PASOS EXITOSOS")
         print("="*70)
-        print(f"\n📊 Resumen:")
+        print("\n📊 Resumen:")
         print(f"   - Eventos generados: {NUM_EVENTOS}")
         print(f"   - Batch ID: {batch_id}")
         print(f"   - Archivo final: {s3_path}")
-        print(f"\n🎯 El pipeline es reproducible y está listo para producción.")
+        print("\n🎯 El pipeline es reproducible y está listo para producción.")
     else:
         print("\n❌ TEST FALLIDO en verificación")
 

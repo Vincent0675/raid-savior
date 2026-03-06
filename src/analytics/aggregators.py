@@ -224,11 +224,9 @@ def build_player_raid_stats(
         deaths_per_10min (opcional),
         role_activity_flag (opcional).
     """
-    # 1. Copia defensiva
+    # Copia defensiva
     df = df_silver.copy()
     
-    # 2. Agrupar por raid + jugador para agregados básicos
-    group = df.groupby(["raid_id", "source_player_id"])
     
     # Daño total por jugador
     damage_per_player = (
@@ -333,7 +331,7 @@ def build_player_raid_stats(
 
     # 8. Contar eventos críticos (is_critical_hit == True)
     crit_events = (
-        df[(df["event_type"].isin(["combat_damage", "heal"])) & (df["is_critical_hit"] == True)]
+        df[(df["event_type"].isin(["combat_damage", "heal"])) & (df["is_critical_hit"].fillna(False))]
         .groupby(["raid_id", "source_player_id"])["event_type"]
         .count()
         .rename("crit_events")

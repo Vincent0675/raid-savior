@@ -7,7 +7,6 @@ from pathlib import Path
 import json
 from datetime import datetime
 
-# ✅ CAMBIO: Usar la clase actualizada (mismo nombre, nuevo código)
 from src.generators.raid_event_generator import WoWEventGenerator  # ← No cambiar nombre
 
 
@@ -68,7 +67,7 @@ def main():
     for etype, count in sorted(event_counts.items()):
         pct = count / len(events) * 100
         print(f"    {etype:20s}: {count:6d} ({pct:5.2f}%)")
-    print(f"  Pydantic validation: 100% (schema-on-write)")
+    print("  Pydantic validation: 100% (schema-on-write)")
     print()
     
     # Prepare output

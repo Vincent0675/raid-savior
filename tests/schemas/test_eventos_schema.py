@@ -9,7 +9,6 @@ Verifica que:
 
 import pytest
 from datetime import datetime, timezone, timedelta
-from uuid import uuid4
 from pydantic import ValidationError
 
 from src.schemas.eventos_schema import (

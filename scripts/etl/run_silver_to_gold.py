@@ -96,7 +96,7 @@ def main() -> int:
             summary = etl.run_all()
 
             print("\n" + "=" * 60)
-            print(f"  RESULTADO BATCH")
+            print("  RESULTADO BATCH")
             print("=" * 60)
             print(f"  Total particiones:  {summary['total_partitions']}")
             print(f"  ✅ Exitosas:        {summary['successful']}")

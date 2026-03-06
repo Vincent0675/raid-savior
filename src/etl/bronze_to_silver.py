@@ -13,8 +13,7 @@ import os
 import json
 import pandas as pd
 import re
-from typing import Dict, Tuple
-from datetime import datetime, timezone
+from typing import Dict
 import io
 
 from src.storage.minio_client import MinIOStorageClient
@@ -36,8 +35,8 @@ class BronzeToSilverETL:
             # MinIO devuelve un stream, lo leemos y decodificamos
             content = response.read().decode('utf-8')
             return json.loads(content)
-        except Exception as e:
-            raise IOError(f"Error leyendo Bronze [{batch_key}]: {e}")
+        except Exception as err:
+            raise IOError(f"Error leyendo Bronze [{batch_key}]: {err}") from err
 
     def save_silver(self, df: pd.DataFrame, raid_id: str, batch_id: str) -> Dict:
         """
@@ -103,8 +102,8 @@ class BronzeToSilverETL:
                 "bytes": data_len
             }
 
-        except Exception as e:
-            raise IOError(f"Error escribiendo Silver: {e}")
+        except Exception as err:
+            raise IOError(f"Error escribiendo Silver: {err}") from err
 
     def run(self, bronze_key: str) -> Dict:
         """

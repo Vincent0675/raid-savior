@@ -14,8 +14,7 @@ Uso:
 import argparse
 import json
 import time
-from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List
 import uuid
 
@@ -59,7 +58,7 @@ class DatasetIngestor:
         """
         total_batches = (len(events) + batch_size - 1) // batch_size
         
-        print(f"\n📡 Ingesta HTTP (Flask Receptor)")
+        print("\n📡 Ingesta HTTP (Flask Receptor)")
         print(f"  Total eventos: {len(events):,}")
         print(f"  Batch size: {batch_size}")
         print(f"  Total batches: {total_batches}")
@@ -98,7 +97,7 @@ class DatasetIngestor:
                         else:
                             time.sleep(1)  # Esperar antes de reintentar
         
-        print(f"\n✅ Ingesta HTTP completada:")
+        print("\n✅ Ingesta HTTP completada:")
         print(f"  Exitosos: {successful:,} eventos")
         print(f"  Fallidos: {failed:,} eventos")
         print(f"  Tasa de éxito: {(successful / len(events) * 100):.2f}%")
@@ -111,7 +110,7 @@ class DatasetIngestor:
             events: Lista de eventos (dicts)
             raid_id: ID de la raid
         """
-        print(f"\n🗄️  Ingesta Directa S3 (MinIO)")
+        print("\n🗄️  Ingesta Directa S3 (MinIO)")
         print(f"  Total eventos: {len(events):,}")
         print(f"  Raid ID: {raid_id}")
         print()
@@ -153,7 +152,7 @@ class DatasetIngestor:
             except Exception as e:
                 tqdm.write(f"❌ Error escribiendo partición {ingest_date}: {e}")
         
-        print(f"\n✅ Ingesta S3 completada:")
+        print("\n✅ Ingesta S3 completada:")
         print(f"  Eventos escritos: {total_written:,}")
         print(f"  Particiones creadas: {len(events_by_date)}")
         print(f"  Bucket: s3://{self.bucket}/wow_raid_events/v1/raidid={raid_id}/")
@@ -196,7 +195,7 @@ class DatasetIngestor:
         elapsed = time.time() - start_time
         throughput = len(events) / elapsed
         
-        print(f"\n⏱️  Métricas de Rendimiento:")
+        print("\n⏱️  Métricas de Rendimiento:")
         print(f"  Tiempo total: {elapsed:.2f}s")
         print(f"  Throughput: {throughput:.0f} eventos/s")
         print()

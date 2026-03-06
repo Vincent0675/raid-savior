@@ -111,7 +111,7 @@ def main():
         raid_dirs = [BRONZE_ROOT]
 
     print_separator("═")
-    print(f"  WoW Raid Telemetry — Inspección Dataset de Producción")
+    print("  WoW Raid Telemetry — Inspección Dataset de Producción")
     print(f"  Root: {BRONZE_ROOT.resolve()}")
     print(f"  Raids encontradas: {len(raid_dirs)}")
     print_separator("═")
