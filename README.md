@@ -135,7 +135,7 @@ La arquitectura Medallion organiza los datos en tres capas de refinamiento progr
 - **Formato:** JSON (array de eventos validados).  
 - **Destino:** bucket `bronze` en MinIO.  
 - **Key pattern (contrato de escritura):**  
-  `wow_raid_events/v1/raidid={raid_id}/ingestdate={YYYY-MM-DD}/batch={uuid}.json`.  
+  `wow_raid_events/v1/raid_id={raid_id}/ingest_date={YYYY-MM-DD}/batch={uuid}.json`.  
 - **Validación:**  
   - Pydantic v2 en el propio receptor (schema-on-write).  
   - Rechazo con HTTP 400 ante eventos inválidos, sin permitir su escritura en Bronze.  
@@ -150,7 +150,7 @@ La arquitectura Medallion organiza los datos en tres capas de refinamiento progr
 - **Formato:** Apache Parquet + compresión Snappy.  
 - **Destino:** bucket `silver` en MinIO.  
 - **Particionamiento lógico:**  
-  `wow_raid_events/v1/raidid={raid_id}/eventdate={YYYY-MM-DD}/...`.  
+  `wow_raid_events/v1/raid_id={raid_id}/event_date={YYYY-MM-DD}/...`.  
 
 **Transformaciones principales (módulo `SilverTransformer`):**
 
@@ -275,7 +275,7 @@ Para el flujo event-driven original (Flask + generador HTTP + SSE):
 
 En una terminal aparte en raíz de proyecto
 ```bash
-python src/api/receiver.py
+python scripts/api/receiver.py
 ```
 
 > Abrir `tests/cliente_sse.html` en un navegador y abrir la consola JS donde se mostrarán los eventos.
@@ -303,10 +303,10 @@ python scripts/etl/run_bronze_to_silver.py
 
 ```bash
 # Procesa TODAS las particiones disponibles en Silver automáticamente
-python scripts/etl/run_silver_to_gold --all
+python scripts/etl/run_silver_to_gold.py --all
 
 # Para re-procesar una partición concreta
-python scripts/etl/run_silver_to_gold --raid-id raid001 --event-date 2026-02-25
+python scripts/etl/run_silver_to_gold.py --raid-id raid001 --event-date 2026-02-25
 ```
 
 
@@ -314,10 +314,10 @@ python scripts/etl/run_silver_to_gold --raid-id raid001 --event-date 2026-02-25
 
 ```bash
 # Vista consolidada de todas las particiones + coherencia
-python scripts/analytics/inspect_gold --all
+python scripts/analytics/inspect_gold.py --all
 
 # Deep-dive en una partición concreta
-python scripts/analytics/inspect_gold --raid-id raid001 --event-date 2026-02-25
+python scripts/analytics/inspect_gold.py --raid-id raid001 --event-date 2026-02-25
 ```
 
 ### Paso 5 — Tests

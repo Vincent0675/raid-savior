@@ -77,7 +77,11 @@ clean_cache.sh
 # Push Dual (Repo personal / Repo académico)
 push-dual.sh
 
+# Dagster
 dagster_home
 .dagster/
 .tmp_dagster_home_unb4hn49/
 .tmp_dagster_home_*/
+
+# Dev tools
+.ruff_cache

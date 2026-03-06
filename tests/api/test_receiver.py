@@ -6,9 +6,8 @@ Phase: 2.1 (HTTP Receiver - Basic)
 
 import pytest
 import json
-from pathlib import Path
 
-from src.api.receiver import create_app
+from scripts.api.receiver import create_app
 from src.generators.raid_event_generator import WoWEventGenerator
 
 

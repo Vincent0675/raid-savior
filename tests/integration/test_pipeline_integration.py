@@ -3,15 +3,11 @@ Test de Integración End-to-End: Fase 1 → 2 → 3
 Valida que el pipeline completo funciona sin intervención manual.
 """
 
-import sys
 import os
 import time
-import json
 import pandas as pd
 import requests
 from datetime import datetime, timezone
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- IMPORTS CORREGIDOS (según tu estructura real) ---
 from src.generators.raid_event_generator import WoWEventGenerator
@@ -102,7 +98,7 @@ def test_fase_3_transformation(batch_id):
             print(f"   ✅ Transformación exitosa")
             print(f"      - Eventos procesados: {result['metadata']['rows_after_validation']}")
             print(f"      - Archivo Parquet: {result['storage']['s3_path']}")
-            assert s3_path is not None, "El ETL no devolvió s3_path"
+            assert 's3_path' is not None, "El ETL no devolvió s3_path"
         else:
             print(f"   ⚠️ SKIPPED: {result.get('reason')}")
             return None
