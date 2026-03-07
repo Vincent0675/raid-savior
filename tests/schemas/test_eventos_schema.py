@@ -140,6 +140,8 @@ def test_valid_mana_regeneration_event():
     )
     
     assert event.resource_type == ResourceType.MANA
+    assert event.resource_amount_after is not None
+    assert event.resource_amount_before is not None
     assert event.resource_amount_after > event.resource_amount_before
     print("✅ Test passed: Valid mana_regeneration event")
 
@@ -153,7 +155,7 @@ def test_extra_fields_rejected():
             raid_id="raid001",
             source_player_id="player123",
             source_player_name="Thrall",
-            invalid_extra_field="should_fail"  # ❌ Campo no definido
+            invalid_extra_field="should_fail"  # type: ignore[call-arg] # intencional test extra='forbid'
         )
     
     errors = exc_info.value.errors()

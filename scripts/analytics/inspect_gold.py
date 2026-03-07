@@ -19,6 +19,7 @@ Version: 2.0 - Fase 4 (modelo semidimensional)
 import argparse
 import io
 import sys
+from typing import Any, cast
 
 import pandas as pd
 
@@ -56,7 +57,7 @@ def _read_parquet(storage: MinIOStorageClient, bucket: str, key: str) -> pd.Data
 def _object_size(storage: MinIOStorageClient, bucket: str, key: str) -> int:
     """Devuelve el tamano en bytes de un objeto en MinIO."""
     response = storage.s3.head_object(Bucket=bucket, Key=key)
-    return response["ContentLength"]
+    return cast(int, response["ContentLength"])
 
 def discover_gold_partitions(
     storage: MinIOStorageClient, bucket: str
@@ -294,10 +295,10 @@ def inspect_partition_compact(
     raid_dps, total_healing, raid_hps, deaths, n_players, coherence_ok,
     coherence_total, error (si falla la lectura).
     """
-    result = {
-        "raid_id":       raid_id,
-        "event_date":    event_date,
-        "error":         None,
+    result: dict[str, Any] = {
+        "raid_id": raid_id,
+        "event_date": event_date,
+        "error": None,
     }
 
     try:

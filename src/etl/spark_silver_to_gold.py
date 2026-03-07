@@ -8,7 +8,7 @@ Tablas producidas:
     s3a://gold/fact_raid_summary/
     s3a://gold/fact_player_raid_stats/
 """
-from __future__ import annotations
+
 import time
 
 import logging
@@ -171,7 +171,7 @@ def compute_dim_raid(df: DataFrame, fact_raid_summary: DataFrame) -> DataFrame:
     return dim.join(event_dates, on="raid_id", how="left")
 
 
-def write_gold(df: DataFrame, table_name: str, partition_col: str = "raid_id") -> None:
+def write_gold(df: DataFrame, table_name: str, partition_col: str | None = "raid_id") -> None:
     """
     Escribe una tabla Gold en MinIO particionada por raid_id.
     Usa mode='overwrite' para idempotencia (re-ejecutable).

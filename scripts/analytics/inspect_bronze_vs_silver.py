@@ -28,8 +28,8 @@ def find_latest_batch():
     paginator = storage.s3.get_paginator('list_objects_v2')
     pages = paginator.paginate(Bucket=bronze_bucket, Prefix='wow_raid_events/')
     
-    latest_file = None
-    latest_time = None
+    latest_file: str | None = None
+    latest_time: datetime | None = None
     
     for page in pages:
         if 'Contents' in page:

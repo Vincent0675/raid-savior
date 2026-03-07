@@ -86,8 +86,12 @@ line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src"]
-exclude = ["^legacy/", "^data/", "^docs/", "^infra/"]
+files = ["src", "tests", "scripts"]
+exclude = [
+    "conftest\\.py$",   # cualquier conftest.py en el árbol
+]
+explicit_package_bases = true
+ignore_missing_imports = true
 warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true

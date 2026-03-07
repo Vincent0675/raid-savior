@@ -59,7 +59,7 @@ def main():
     events = gen.generate_events(session=session, num_events=NUM_EVENTS)
     
     # Stats
-    event_counts = {}
+    event_counts: dict[str, int] = {}
     for e in events:
         event_counts[e.event_type.value] = event_counts.get(e.event_type.value, 0) + 1
     

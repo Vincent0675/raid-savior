@@ -17,13 +17,14 @@ Maneja dos formatos de JSON:
 import json
 from pathlib import Path
 from collections import Counter
+from typing import Any, cast
 
 # ─── CONFIGURA ESTE PATH ────────────────────────────────────────────────────
 BRONZE_ROOT = Path("data/bronze/production")   # ← ajusta si tu carpeta tiene otro nombre
 # ────────────────────────────────────────────────────────────────────────────
 
 
-def load_events_from_file(filepath: Path) -> list[dict]:
+def load_events_from_file(filepath: Path) -> list[dict[str, Any]]:
     """Carga eventos de un JSON, sea lista plana o batch object."""
     with open(filepath, encoding="utf-8") as f:
         data = json.load(f)
@@ -31,7 +32,7 @@ def load_events_from_file(filepath: Path) -> list[dict]:
     if isinstance(data, list):
         return data                         # formato lista plana
     if isinstance(data, dict) and "events" in data:
-        return data["events"]               # formato batch object
+        return cast(list[dict[str, Any]], data["events"])        # cast explícito ✓
     # Fallback: intenta tratar el dict como evento único
     return [data]
 
@@ -47,9 +48,9 @@ def inspect_raid(raid_dir: Path) -> dict:
         return {}
 
     total_events   = 0
-    type_counter   = Counter()
-    class_counter  = Counter()
-    role_counter   = Counter()
+    type_counter:   Counter[str] = Counter()
+    class_counter:  Counter[str] = Counter()
+    role_counter:   Counter[str] = Counter()
     damage_values  = []
     heal_values    = []
     boss_phases    = 0
@@ -118,9 +119,9 @@ def main():
 
     # ── Acumuladores globales ──────────────────────────────────────────────
     global_events  = 0
-    global_types   = Counter()
-    global_classes = Counter()
-    global_roles   = Counter()
+    global_types:   Counter[str] = Counter()
+    global_classes: Counter[str] = Counter()
+    global_roles:   Counter[str] = Counter()
     global_damage  = []
     global_heal    = []
 

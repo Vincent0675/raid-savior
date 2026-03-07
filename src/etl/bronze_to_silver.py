@@ -10,10 +10,9 @@ v2.1: Resolución de timestamps en microsegundos para compatibilidad nativa con 
 """
 
 import os
-import json
 import pandas as pd
 import re
-from typing import Dict
+from typing import Any, Union
 import io
 
 from src.storage.minio_client import MinIOStorageClient
@@ -28,17 +27,19 @@ class BronzeToSilverETL:
         self.bucket_silver = os.getenv("S3_BUCKET_SILVER", "silver")
         self.transformer = SilverTransformer()
 
-    def read_bronze_batch(self, batch_key: str) -> Dict:
+    def read_bronze_batch(self, batch_key: str) -> Union[dict[str, Any], list[Any]]:
         """Descarga y deserializa el JSON de Bronze"""
         try:
             response = self.storage.get_object(self.bucket_bronze, batch_key)
             # MinIO devuelve un stream, lo leemos y decodificamos
             content = response.read().decode('utf-8')
-            return json.loads(content)
+            if not isinstance(content, dict):
+                raise ValueError(f"Expected JSON object, got {type(content).__name__}")
+            return content
         except Exception as err:
             raise IOError(f"Error leyendo Bronze [{batch_key}]: {err}") from err
 
-    def save_silver(self, df: pd.DataFrame, raid_id: str, batch_id: str) -> Dict:
+    def save_silver(self, df: pd.DataFrame, raid_id: str, batch_id: str) -> dict:
         """
         Guarda el DataFrame como Parquet comprimido con Snappy.
         Ruta: raid_id=X / event_date=Y / part-Z.parquet
@@ -105,7 +106,7 @@ class BronzeToSilverETL:
         except Exception as err:
             raise IOError(f"Error escribiendo Silver: {err}") from err
 
-    def run(self, bronze_key: str) -> Dict:
+    def run(self, bronze_key: str) -> dict:
         """
         Ejecuta el ciclo completo para un archivo específico.
         Soporta dos formatos de JSON:
@@ -143,7 +144,7 @@ class BronzeToSilverETL:
                 return {"status": "skipped", "reason": "empty_array"}
 
         else:
-            return {"status": "error", "reason": f"unknown_json_type: {type(raw_data)}"}
+            return {"status": "error", "reason": f"unknown_json_type: {type(raw_data)}"}    # type: ignore[unreachable]
         
         # 3. TRANSFORM
         df_raw = pd.DataFrame(events_list)

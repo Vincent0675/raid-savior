@@ -15,7 +15,7 @@ import argparse
 import json
 import time
 from datetime import datetime
-from typing import List
+from typing import Any
 import uuid
 
 import requests
@@ -28,7 +28,10 @@ from src.generators.raid_event_generator import WoWEventGenerator
 class DatasetIngestor:
     """Orquestador de ingesta masiva con múltiples backends."""
     
-    def __init__(self, mode: str = "http"):
+    def __init__(
+        self,
+        mode: str = "http"
+    ):
         self.mode = mode
         
         if mode == "http":
@@ -43,8 +46,8 @@ class DatasetIngestor:
             self.bucket = "bronze"
     
     def ingest_via_http(
-        self, 
-        events: List, 
+        self,
+        events: list[dict[str, Any]],
         batch_size: int = 1000,
         max_retries: int = 3
     ):
@@ -102,7 +105,11 @@ class DatasetIngestor:
         print(f"  Fallidos: {failed:,} eventos")
         print(f"  Tasa de éxito: {(successful / len(events) * 100):.2f}%")
     
-    def ingest_via_s3(self, events: List, raid_id: str = "raid001"):
+    def ingest_via_s3(
+            self,
+            events: list[dict[str, Any]],
+            raid_id: str = "raid001"
+    ):
         """
         Ingesta directa a MinIO (S3) sin pasar por Flask.
         
@@ -116,7 +123,7 @@ class DatasetIngestor:
         print()
         
         # Agrupar eventos por ingest_date para particionamiento
-        events_by_date = {}
+        events_by_date: dict[str, list[dict[str, Any]]] = {}
         for event in events:
             # Usar timestamp del evento (no ingestion_timestamp)
             event_ts = datetime.fromisoformat(event['timestamp'].replace('Z', '+00:00'))
@@ -157,7 +164,11 @@ class DatasetIngestor:
         print(f"  Particiones creadas: {len(events_by_date)}")
         print(f"  Bucket: s3://{self.bucket}/wow_raid_events/v1/raidid={raid_id}/")
     
-    def run(self, num_events: int, batch_size: int = 1000):
+    def run(
+        self,
+        num_events: int,
+        batch_size: int = 1000
+    ):
         """Pipeline completo: Generar → Ingerir."""
         
         print("=" * 70)
