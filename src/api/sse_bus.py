@@ -1,5 +1,5 @@
 from collections import deque
-from typing import Deque, List, Dict, Any
+from typing import Any
 import threading
 
 class SSEBus:
@@ -10,19 +10,19 @@ class SSEBus:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._subscribers: List[Deque[Dict[str, Any]]] = []
+        self._subscribers: list[deque[dict[str, Any]]] = []
 
-    def subscribe(self) -> Deque[Dict[str, Any]]:
+    def subscribe(self) -> deque[dict[str, Any]]:
         """
         Crea una cola para un nuevo cliente y la regista.
         Devuelve la deque para que el endpoint SSE la use.
         """
-        q: Deque[Dict[str, Any]] = deque()
+        q: deque[dict[str, Any]] = deque()
         with self._lock:
             self._subscribers.append(q)
         return q
 
-    def unsubscribe(self, q: Deque[Dict[str, Any]]) -> None:
+    def unsubscribe(self, q: deque[dict[str, Any]]) -> None:
         """
         Elimina la cola del cliente cuando este se desconecta.
         """
@@ -30,7 +30,7 @@ class SSEBus:
             if q in self._subscribers:
                 self._subscribers.remove(q)
     
-    def publish(self, event_dict: Dict[str, Any]) -> None:
+    def publish(self, event_dict: dict[str, Any]) -> None:
         """
         Envía un evento (dict JSON-serializable) a todas las colas activas.
         """

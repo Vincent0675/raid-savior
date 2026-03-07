@@ -21,7 +21,6 @@ Versión: 1.0 — Fase 4
 
 from datetime import date
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -139,11 +138,11 @@ class DimRaidSchema(BaseModel):
     event_date: date = Field(
         description="Fecha del encuentro",
     )
-    boss_name: Optional[str] = Field(
+    boss_name: str | None = Field(
         default="Unknown Boss",
         description="Nombre del boss principal del encuentro",
     )
-    difficulty: Optional[str] = Field(
+    difficulty: str | None = Field(
         default="Normal",
         description="Nivel de dificultad: Normal | Heroic | Mythic",
     )
@@ -160,7 +159,7 @@ class DimRaidSchema(BaseModel):
 
     @field_validator("difficulty")
     @classmethod
-    def validate_difficulty(cls, v: Optional[str]) -> Optional[str]:
+    def validate_difficulty(cls, v: str | None) -> str | None:
         if v is None:
             return "Normal"
         allowed = {"Normal", "Heroic", "Mythic"}

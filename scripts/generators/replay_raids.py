@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
-from typing import List
 import argparse
 import time
 import requests
 import os
 import json
-from typing import Sequence, Dict, Any
+from typing import Any
+from collections.abc import Sequence
 import uuid
 
 from src.generators.raid_event_generator import WoWEventGenerator, RaidSession, WoWRaidEvent
@@ -16,7 +16,7 @@ def build_raid_events(
         num_players: int,
         duration_s: int,
         num_events:int,
-) -> List["WoWRaidEvent"]:
+) -> list["WoWRaidEvent"]:
     """
     Crea una RaidSession y genera num_events eventos para esa raid.
     """
@@ -85,7 +85,7 @@ def write_batch_file(
 
     return path
 
-def append_run_record(record: Dict[str, Any], catalog_path: str = "data/run_catalog.jsonl") -> None:
+def append_run_record(record: dict[str, Any], catalog_path: str = "data/run_catalog.jsonl") -> None:
     """
     Añade un registro de ejecución (run) al catálogo en formato JSONL.
     Crea el directorio si no existe.
@@ -180,7 +180,7 @@ def main():
 
     run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
-    record: Dict[str, Any] = {
+    record: dict[str, Any] = {
         "run_id": run_id,
         "timestamp_start": t_start_utc,
         "timestamp_end": t_end_utc,

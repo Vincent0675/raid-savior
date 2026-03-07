@@ -4,7 +4,7 @@ Encapsulan la lógica de limpieza, validación y enriquecimiento.
 """
 
 import pandas as pd
-from typing import Tuple, Any
+from typing import Any
 
 class SilverTransformer:
     """
@@ -77,7 +77,7 @@ class SilverTransformer:
         return df
 
     @staticmethod
-    def deduplicate(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
+    def deduplicate(df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
         """
         Filtro de Ruido: Elimina rebotes de señal (eventos duplicados).
         Retorna: (DataFrame limpio, cantidad de eliminados)
@@ -90,7 +90,7 @@ class SilverTransformer:
         return df, duplicates_removed
 
     @staticmethod
-    def validate_ranges(df: pd.DataFrame) -> Tuple[pd.DataFrame, list[str]]:
+    def validate_ranges(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
         """
         Protección de Sobrevoltaje:
         Descarta valores físicamente imposibles (ej. salud < 0% o > 100%).
@@ -143,7 +143,7 @@ class SilverTransformer:
         return df
 
     @staticmethod
-    def transform_pipeline(df: pd.DataFrame) -> Tuple[pd.DataFrame, dict[str, Any]]:
+    def transform_pipeline(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
         """
         Circuito completo: Tipado -> Deduplicación -> Validación -> Enriquecimiento
         """

@@ -2,7 +2,7 @@ import os
 import json
 import boto3
 from botocore.exceptions import ClientError
-from typing import Dict, Any
+from typing import Any
 
 class MinIOStorageClient:
     """
@@ -36,7 +36,7 @@ class MinIOStorageClient:
         ingest_date = ingest_timestamp[:10]
         return f"wow_raid_events/v1/raidid={raidid}/ingest_date={ingest_date}/batch_{batch_id}.json"
 
-    def save_batch(self, raidid: str, batch_data: Dict[str, Any]) -> Dict[str, str]:
+    def save_batch(self, raidid: str, batch_data: dict[str, Any]) -> dict[str, str]:
         """
         Persiste un batch validado en Bronze.
         """

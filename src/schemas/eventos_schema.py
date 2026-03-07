@@ -8,7 +8,6 @@ Autor: Pipeline WoW Team
 """
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List
 from datetime import datetime, timezone
 from enum import Enum
 from uuid import UUID, uuid4
@@ -109,12 +108,12 @@ class WoWRaidEvent(BaseModel):
         description="Raid identifier (e.g., raid001)"
     )
     
-    encounter_id: Optional[str] = Field(
+    encounter_id: str | None = Field(
         default=None,
         description="Boss encounter identifier (optional)"
     )
     
-    encounter_duration_ms: Optional[int] = Field(
+    encounter_duration_ms: int | None = Field(
         default=None,
         ge=0,
         description="Duration of encounter in milliseconds"
@@ -132,17 +131,17 @@ class WoWRaidEvent(BaseModel):
         description="Player name"
     )
     
-    source_player_role: Optional[PlayerRole] = Field(
+    source_player_role: PlayerRole | None = Field(
         default=None,
         description="Player role (tank, healer, dps)"
     )
     
-    source_player_class: Optional[PlayerClass] = Field(
+    source_player_class: PlayerClass | None = Field(
         default=None,
         description="Player class (warrior, mage, etc.)"
     )
     
-    source_player_level: Optional[int] = Field(
+    source_player_level: int | None = Field(
         default=None,
         ge=1,
         le=90,
@@ -150,30 +149,30 @@ class WoWRaidEvent(BaseModel):
     )
     
     # ====== ACCIÓN (Ability) ======
-    ability_id: Optional[str] = Field(
+    ability_id: str | None = Field(
         default=None,
         description="Ability/spell identifier"
     )
     
-    ability_name: Optional[str] = Field(
+    ability_name: str | None = Field(
         default=None,
         description="Ability/spell name"
     )
     
-    ability_school: Optional[DamageSchool] = Field(
+    ability_school: DamageSchool | None = Field(
         default=None,
         description="Damage/healing school (fire, frost, holy, etc.)"
     )
     
     # ====== DATOS CUANTITATIVOS ======
-    damage_amount: Optional[float] = Field(
+    damage_amount: float | None = Field(
         default=None,
         ge=0,
         le=1_000_000,
         description="Damage dealt (for combat_damage events)"
     )
     
-    healing_amount: Optional[float] = Field(
+    healing_amount: float | None = Field(
         default=None,
         ge=0,
         le=500_000,
@@ -197,29 +196,29 @@ class WoWRaidEvent(BaseModel):
     is_absorbed: bool = Field(default=False)
     
     # ====== TARGET (Receptor del evento) ======
-    target_entity_id: Optional[str] = Field(
+    target_entity_id: str | None = Field(
         default=None,
         description="Target entity identifier"
     )
     
-    target_entity_name: Optional[str] = Field(
+    target_entity_name: str | None = Field(
         default=None,
         description="Target entity name"
     )
     
-    target_entity_type: Optional[EntityType] = Field(
+    target_entity_type: EntityType | None = Field(
         default=None,
         description="Type of target (player, boss, add, interactive)"
     )
     
-    target_entity_health_pct_before: Optional[float] = Field(
+    target_entity_health_pct_before: float | None = Field(
         default=None,
         ge=0,
         le=100,
         description="Target health percentage before event"
     )
     
-    target_entity_health_pct_after: Optional[float] = Field(
+    target_entity_health_pct_after: float | None = Field(
         default=None,
         ge=0,
         le=100,
@@ -227,24 +226,24 @@ class WoWRaidEvent(BaseModel):
     )
     
     # ====== RECURSOS (Para mana_regeneration) ======
-    resource_type: Optional[ResourceType] = Field(
+    resource_type: ResourceType | None = Field(
         default=None,
         description="Type of resource (mana, energy, rage, etc.)"
     )
     
-    resource_amount_before: Optional[float] = Field(
+    resource_amount_before: float | None = Field(
         default=None,
         ge=0,
         description="Resource amount before event"
     )
     
-    resource_amount_after: Optional[float] = Field(
+    resource_amount_after: float | None = Field(
         default=None,
         ge=0,
         description="Resource amount after event"
     )
     
-    resource_regeneration_rate: Optional[float] = Field(
+    resource_regeneration_rate: float | None = Field(
         default=None,
         ge=0,
         description="Resource regeneration rate (units per second)"
@@ -261,18 +260,18 @@ class WoWRaidEvent(BaseModel):
         description="System that generated this event"
     )
     
-    data_quality_flags: List[str] = Field(
+    data_quality_flags: list[str] = Field(
         default_factory=list,
         description="Data quality flags (e.g., ['late_arrival', 'missing_target'])"
     )
     
-    server_latency_ms: Optional[int] = Field(
+    server_latency_ms: int | None = Field(
         default=None,
         ge=0,
         description="Server latency in milliseconds"
     )
     
-    client_latency_ms: Optional[int] = Field(
+    client_latency_ms: int | None = Field(
         default=None,
         ge=0,
         description="Client latency in milliseconds"
@@ -304,7 +303,7 @@ class WoWRaidEvent(BaseModel):
     
     @field_validator('damage_amount')
     @classmethod
-    def validate_damage_for_damage_events(cls, v: Optional[float], info) -> Optional[float]:
+    def validate_damage_for_damage_events(cls, v: float | None, info) -> float | None:
         """
         Validador: Si event_type es COMBAT_DAMAGE, damage_amount es OBLIGATORIO y > 0.
         
@@ -320,7 +319,7 @@ class WoWRaidEvent(BaseModel):
     
     @field_validator('healing_amount')
     @classmethod
-    def validate_healing_for_heal_events(cls, v: Optional[float], info) -> Optional[float]:
+    def validate_healing_for_heal_events(cls, v: float | None, info) -> float | None:
         """
         Validador: Si event_type es HEAL, healing_amount es OBLIGATORIO y > 0.
         """
@@ -334,7 +333,7 @@ class WoWRaidEvent(BaseModel):
     
     @field_validator('resource_type')
     @classmethod
-    def validate_resource_for_mana_events(cls, v: Optional[ResourceType], info) -> Optional[ResourceType]:
+    def validate_resource_for_mana_events(cls, v: ResourceType | None, info) -> ResourceType | None:
         """
         Validador: Si event_type es MANA_REGENERATION, resource_type es OBLIGATORIO.
         """
@@ -367,7 +366,7 @@ class EventBatch(BaseModel):
         description="When the batch was created"
     )
     
-    events: List[WoWRaidEvent] = Field(
+    events: list[WoWRaidEvent] = Field(
         min_length=1,
         max_length=10_000,
         description="List of events in this batch (max 10,000)"

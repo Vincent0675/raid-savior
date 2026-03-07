@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List
 import random
 import uuid
 
@@ -115,8 +114,8 @@ class RaidSession:
     boss_name: str
     start_time: datetime
     end_time: datetime
-    players: List[Player]
-    phases: List[BossPhase] = field(default_factory=list)
+    players: list[Player]
+    phases: list[BossPhase] = field(default_factory=list)
 
 
 class WoWEventGenerator:
@@ -143,7 +142,7 @@ class WoWEventGenerator:
         raid_id: str = "raid001",
         num_players: int = 20,
         duration_s: int = 300,
-        start_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
         boss_name: str = "Ragnaros",
     ) -> RaidSession:
         """Genera una sesión de raid con fases de boss."""
@@ -154,7 +153,7 @@ class WoWEventGenerator:
         
         end_time = start_time + timedelta(seconds=duration_s)
         
-        players: List[Player] = [] 
+        players: list[Player] = [] 
 
         role_names   = list(RAID_ROLE_WEIGHTS.keys())    # ["tank", "healer", "dps"]
         role_weights = list(RAID_ROLE_WEIGHTS.values())  # [0.10,   0.20,     0.70]
@@ -220,8 +219,8 @@ class WoWEventGenerator:
         self, 
         session: RaidSession, 
         num_events: int = 1000,
-        event_distribution: Optional[dict] = None
-    ) -> List[WoWRaidEvent]:
+        event_distribution: dict | None = None
+    ) -> list[WoWRaidEvent]:
         """
         Genera eventos distribuidos por fases del boss.
         
@@ -242,7 +241,7 @@ class WoWEventGenerator:
                 "player_death": 0.02
             }
         
-        events: List[WoWRaidEvent] = []
+        events: list[WoWRaidEvent] = []
         
         # Si no hay fases, generar con patrón uniforme (backward compatibility)
         if not session.phases:
@@ -312,7 +311,7 @@ class WoWEventGenerator:
             events.append(ev)
         return events
 
-    def _generate_simple_events(self, session: RaidSession, num_events: int) -> List[WoWRaidEvent]:
+    def _generate_simple_events(self, session: RaidSession, num_events: int) -> list[WoWRaidEvent]:
         """Generación simple (backward compatibility con v1)."""
         start_ts = session.start_time.timestamp()
         end_ts = session.end_time.timestamp()
@@ -328,7 +327,7 @@ class WoWEventGenerator:
             death_probability=0.0
         )
         
-        events: List[WoWRaidEvent] = []
+        events: list[WoWRaidEvent] = []
         for ts in timestamps:
             timestamp = datetime.fromtimestamp(float(ts), tz=timezone.utc)
             player = self._pick_player(session) 
@@ -354,7 +353,7 @@ class WoWEventGenerator:
         timestamps = start_ts + beta_samples * (end_ts - start_ts)
         return np.sort(timestamps)
 
-    def _pick_player(self, session: RaidSession, role: Optional[str] = None) -> Player:
+    def _pick_player(self, session: RaidSession, role: str | None = None) -> Player:
         """Selecciona un jugador (opcionalmente por rol)."""
         if role:
             candidates = [p for p in session.players if p.role == role]

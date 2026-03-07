@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
 import pandas as pd
 from pydantic import BaseModel, ValidationError
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 # Cada tabla tiene su propio prefijo raíz.
 # Dentro, se particiona por raid_id y event_date (Hive-style).
-_PATH_TEMPLATES: Dict[str, str] = {
+_PATH_TEMPLATES: dict[str, str] = {
     "dim_player":             "dim_player/player_id={player_id}/dim_player.parquet",
     "dim_raid":               "dim_raid/raid_id={raid_id}/dim_raid.parquet",
     "fact_raid_summary":      "fact_raid_summary/raid_id={raid_id}/event_date={event_date}/fact_raid_summary.parquet",
@@ -60,7 +60,7 @@ _PATH_TEMPLATES: Dict[str, str] = {
 # HELPER: validación de DataFrame contra schema Pydantic
 # ============================================================================
 
-def _validate_dataframe(df: pd.DataFrame, schema: Type[BaseModel], table_name: str) -> None:
+def _validate_dataframe(df: pd.DataFrame, schema: type[BaseModel], table_name: str) -> None:
     """
     Valida cada fila de un DataFrame contra un schema Pydantic v2.
 
@@ -73,7 +73,7 @@ def _validate_dataframe(df: pd.DataFrame, schema: Type[BaseModel], table_name: s
     schema     : Clase Pydantic (ej. FactRaidSummarySchema).
     table_name : Nombre de la tabla (para mensajes de error claros).
     """
-    errors: List[str] = []
+    errors: list[str] = []
 
     for idx, row in df.iterrows():
         try:
@@ -103,7 +103,7 @@ class GoldLayerETL:
     valida contra schemas Pydantic v2 y escribe en MinIO Gold.
     """
 
-    def __init__(self, config: Optional[Config] = None) -> None:
+    def __init__(self, config: Config | None = None) -> None:
         self.config = config or Config()
         self.storage = MinIOStorageClient()
         self.gold_bucket = self.config.S3_BUCKET_GOLD
@@ -144,8 +144,8 @@ class GoldLayerETL:
                 f"Prefijo buscado: s3://{self.silver_bucket}/{prefix}"
             )
 
-        dfs: List[pd.DataFrame] = []
-        failed: List[str] = []
+        dfs: list[pd.DataFrame] = []
+        failed: list[str] = []
 
         for obj_key in objects:
             try:
@@ -350,7 +350,7 @@ class GoldLayerETL:
         dim_raid: pd.DataFrame,
         fact_raid_summary: pd.DataFrame,
         fact_player_raid_stats: pd.DataFrame,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Valida y escribe las 4 tablas Gold en MinIO.
 
@@ -425,7 +425,7 @@ class GoldLayerETL:
     # ORQUESTADOR PRINCIPAL                                                #
     # ------------------------------------------------------------------ #
 
-    def run_for_partition(self, raid_id: str, event_date: str) -> Dict[str, Any]:
+    def run_for_partition(self, raid_id: str, event_date: str) -> dict[str, Any]:
         """
         Pipeline Gold completo para una partición (raid_id + event_date).
 

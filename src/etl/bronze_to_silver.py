@@ -12,7 +12,8 @@ v2.1: Resolución de timestamps en microsegundos para compatibilidad nativa con 
 import os
 import pandas as pd
 import re
-from typing import Any, Union
+import json
+from typing import Any
 import io
 
 from src.storage.minio_client import MinIOStorageClient
@@ -27,17 +28,18 @@ class BronzeToSilverETL:
         self.bucket_silver = os.getenv("S3_BUCKET_SILVER", "silver")
         self.transformer = SilverTransformer()
 
-    def read_bronze_batch(self, batch_key: str) -> Union[dict[str, Any], list[Any]]:
+    def read_bronze_batch(self, batch_key: str) -> dict[str, Any] | list[Any]:
         """Descarga y deserializa el JSON de Bronze"""
         try:
             response = self.storage.get_object(self.bucket_bronze, batch_key)
             # MinIO devuelve un stream, lo leemos y decodificamos
             content = response.read().decode('utf-8')
-            if not isinstance(content, dict):
+            data = json.loads(content)
+            if not isinstance(data, dict | list):
                 raise ValueError(f"Expected JSON object, got {type(content).__name__}")
-            return content
+            return data
         except Exception as err:
-            raise IOError(f"Error leyendo Bronze [{batch_key}]: {err}") from err
+            raise OSError(f"Error leyendo Bronze [{batch_key}]: {err}") from err
 
     def save_silver(self, df: pd.DataFrame, raid_id: str, batch_id: str) -> dict:
         """
@@ -104,7 +106,7 @@ class BronzeToSilverETL:
             }
 
         except Exception as err:
-            raise IOError(f"Error escribiendo Silver: {err}") from err
+            raise OSError(f"Error escribiendo Silver: {err}") from err
 
     def run(self, bronze_key: str) -> dict:
         """
