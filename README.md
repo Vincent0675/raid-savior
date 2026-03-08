@@ -244,26 +244,35 @@ conda env create -f environment.yml
 mamba activate wow-telemetry
 ```
 #### 3. Instalar paquetes del proyecto
+
 > Paquetes sin herramientas de desarrollo
 ```bash
 pip install -e .
 ```
+
+##### 3.1 Herramientas de desarrollador
+
 > Paquetes con herramientas de desarrollo
 ```bash
 pip install -e .[dev]
 ```
+> Si descargas las herramientas de desarrollo
+```bash
+# Instalar los hooks de pre-commit
+pre-commit install
+```
 
-#### 3. Descargar los JARS de Spark (SOLO UNA VEZ)
+#### 4. Descargar los JARS de Spark (SOLO UNA VEZ)
 ```bash
 chmod +x scripts/download_spark_jars.sh
 ./scripts/download_spark_jars.sh
 ```
 
-#### 3. Levantar MinIO
+#### 5. Levantar MinIO
 ```bash
 cd infra/minio && docker compose up -d
 ```
-#### 4. Ingresar a http://localhost:9001/, introducir las credenciales (`minio` | `minio123` por predeterminado) y crear los Buckets "bronze", "silver" y "gold".
+#### 6. Ingresar a http://localhost:9001/, introducir las credenciales (`minio` | `minio123` por predeterminado) y crear los Buckets "bronze", "silver" y "gold".
 
 ***
 
