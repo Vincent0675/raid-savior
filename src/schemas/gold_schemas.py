@@ -29,8 +29,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 # ENUMERACIONES
 # ============================================================================
 
+
 class RaidOutcome(str, Enum):
     """Resultado del encuentro de raid."""
+
     SUCCESS = "success"
     WIPE = "wipe"
 
@@ -40,27 +42,34 @@ class PlayerStyle(str, Enum):
     Estilos de juego detectables por clustering (Fase C del roadmap).
     Documentados aquí como contrato anticipado.
     """
+
     # DPS Styles
-    AGGRESSIVE_DPS   = "aggressive_dps"    # Mucho daño, menos mecánico (alta habilidad / alto riesgo)
-    MECHANIC_DPS     = "mechanic_dps"      # Daño sostenido, sacrificio de dps bruto para seguir mecánicas
-    UTILITY_DPS      = "utility_dps"       # Daño sacrificado para aportar buff/herramientas a grupo
+    AGGRESSIVE_DPS = (
+        "aggressive_dps"  # Mucho daño, menos mecánico (alta habilidad / alto riesgo)
+    )
+    MECHANIC_DPS = (
+        "mechanic_dps"  # Daño sostenido, sacrificio de dps bruto para seguir mecánicas
+    )
+    UTILITY_DPS = (
+        "utility_dps"  # Daño sacrificado para aportar buff/herramientas a grupo
+    )
 
     # HEALER Styles
-    TANK_HEALER      = "tank_healer"       # Healer enfocado en mantener sano a tanks
-    RAID_HEALER      = "raid_healer"       # Healer enfocado en mantener sano a grupos de raid (dps/otros healers)
-    RESCUE_HEALER    = "rescue_healer"     # Healer con alta capacidad de reacción para salvar jugadores de muertes tras errores o a punto de morir
+    TANK_HEALER = "tank_healer"  # Healer enfocado en mantener sano a tanks
+    RAID_HEALER = "raid_healer"  # Healer enfocado en mantener sano a grupos de raid (dps/otros healers)
+    RESCUE_HEALER = "rescue_healer"  # Healer con alta capacidad de reacción para salvar jugadores de muertes tras errores o a punto de morir
 
     # TANK Styles
-    SURVIVAL_TANK    = "survival_tank"     # Tank con altas stats de alta supervivencia, daño recibido relativamente bajo
-    AGGRESIVE_TANK   = "aggressive_tank"   # Tank con altas stats enfocado a daño, DPS alto para su rol, daño recibido alto pero controlado
-    
+    SURVIVAL_TANK = "survival_tank"  # Tank con altas stats de alta supervivencia, daño recibido relativamente bajo
+    AGGRESIVE_TANK = "aggressive_tank"  # Tank con altas stats enfocado a daño, DPS alto para su rol, daño recibido alto pero controlado
 
-    UNKNOWN          = "unknown"           # Sin clasificar (default inicial)
+    UNKNOWN = "unknown"  # Sin clasificar (default inicial)
 
 
 # ============================================================================
 # DIMENSIONES
 # ============================================================================
+
 
 class DimPlayerSchema(BaseModel):
     """
@@ -70,7 +79,7 @@ class DimPlayerSchema(BaseModel):
     Estrategia de actualización: Type 1 SCD
         (se sobreescribe last_seen_date y total_raids en cada proceso).
     """
-    
+
     player_id: str = Field(
         min_length=1,
         description="Identificador único del jugador (coincide con source_player_id de Silver)",
@@ -121,6 +130,7 @@ class DimPlayerSchema(BaseModel):
     def validate_spec(cls, v: str) -> str: 
         allowed = {}
     """
+
 
 class DimRaidSchema(BaseModel):
     """
@@ -174,6 +184,7 @@ class DimRaidSchema(BaseModel):
 # TABLAS DE HECHOS
 # ============================================================================
 
+
 class FactRaidSummarySchema(BaseModel):
     """
     fact_raid_summary — KPIs macro por raid.
@@ -218,9 +229,9 @@ class FactRaidSummarySchema(BaseModel):
 
     # --- Composición ---
     n_players: int = Field(ge=1, le=40, description="Jugadores únicos participantes")
-    n_tanks: int   = Field(ge=0, description="Número de tanks")
+    n_tanks: int = Field(ge=0, description="Número de tanks")
     n_healers: int = Field(ge=0, description="Número de healers")
-    n_dps: int     = Field(ge=0, description="Número de DPS")
+    n_dps: int = Field(ge=0, description="Número de DPS")
 
     # --- Rendimiento global ---
     raid_dps: float = Field(ge=0.0, description="DPS promedio global de la raid")
@@ -285,7 +296,8 @@ class FactPlayerRaidStatsSchema(BaseModel):
     # --- Eficiencia ---
     crit_events: int = Field(ge=0, description="Golpes/curaciones críticas")
     crit_rate: float = Field(
-        ge=0.0, le=1.0,
+        ge=0.0,
+        le=1.0,
         description="Tasa de críticos: crit_events / (damage_events + healing_events)",
     )
     dps: float = Field(ge=0.0, description="Daño por segundo del jugador")
@@ -293,11 +305,13 @@ class FactPlayerRaidStatsSchema(BaseModel):
 
     # --- Shares (contribución relativa a la raid) ---
     damage_share: float = Field(
-        ge=0.0, le=1.0,
+        ge=0.0,
+        le=1.0,
         description="Proporción del daño total de la raid aportado por este jugador",
     )
     healing_share: float = Field(
-        ge=0.0, le=1.0,
+        ge=0.0,
+        le=1.0,
         description="Proporción de la curación total aportada por este jugador",
     )
 
@@ -306,7 +320,9 @@ class FactPlayerRaidStatsSchema(BaseModel):
     def validate_role(cls, v: str) -> str:
         allowed = {"tank", "healer", "dps", "unknown"}
         if v.lower() not in allowed:
-            raise ValueError(f"player_role debe ser tank | healer | dps, recibido: '{v}'")
+            raise ValueError(
+                f"player_role debe ser tank | healer | dps, recibido: '{v}'"
+            )
         return v.lower()
 
     @field_validator("crit_rate")
@@ -323,6 +339,7 @@ class FactPlayerRaidStatsSchema(BaseModel):
 # ============================================================================
 # TABLA DERIVADA FUTURA — DOCUMENTADA COMO CONTRATO ANTICIPADO
 # ============================================================================
+
 
 class PlayerImpactIndexSchema(BaseModel):
     """

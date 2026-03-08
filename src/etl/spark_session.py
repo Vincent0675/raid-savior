@@ -26,52 +26,45 @@ def get_spark_session(app_name: str = "WoWRaidTelemetry") -> SparkSession:
     Usa AWS SDK v1 (hadoop-aws 3.3.4 + aws-java-sdk-bundle-1.12.262).
     """
     return (
-        SparkSession.builder
-        .master("local[*]")               # usa todos los cores del TUF
+        SparkSession.builder.master("local[*]")  # usa todos los cores del TUF
         .appName(app_name)
-        .config("spark.jars", SPARK_JARS) # los JARs que descargaste
-
+        .config("spark.jars", SPARK_JARS)  # los JARs que descargaste
         # ── Iceberg: carga en classloader del driver ──────────────────
         .config(
             "spark.driver.extraClassPath",
-            str(Path.home() / "spark-jars" / "iceberg-spark-runtime-3.5_2.12-1.7.1.jar")
+            str(
+                Path.home() / "spark-jars" / "iceberg-spark-runtime-3.5_2.12-1.7.1.jar"
+            ),
         )
-
         # ── Iceberg catalog ───────────────────────────────────────────
         .config(
             "spark.sql.extensions",
-            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
         )
-        .config("spark.sql.catalog.wow",             "org.apache.iceberg.spark.SparkCatalog")
-        .config("spark.sql.catalog.wow.type",        "hadoop")
-        .config("spark.sql.catalog.wow.warehouse",   "s3a://warehouse/")
-
+        .config("spark.sql.catalog.wow", "org.apache.iceberg.spark.SparkCatalog")
+        .config("spark.sql.catalog.wow.type", "hadoop")
+        .config("spark.sql.catalog.wow.warehouse", "s3a://warehouse/")
         # Memoria del driver — conservador para laptop
         .config("spark.driver.memory", "2g")
-
         # ── Conector S3A → MinIO ──────────────────────────────────────
         # Dónde está MinIO (leído de Config, igual que en tu config.py)
         .config("spark.hadoop.fs.s3a.endpoint", Config.S3_ENDPOINT_URL)
-
         # MinIO usa path-style: localhost:9000/bucket (no bucket.localhost)
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
-
         # Credenciales estáticas (las mismas de tu .env)
-        .config("spark.hadoop.fs.s3a.access.key",  Config.S3_ACCESS_KEY)
-        .config("spark.hadoop.fs.s3a.secret.key",  Config.S3_SECRET_KEY)
-
+        .config("spark.hadoop.fs.s3a.access.key", Config.S3_ACCESS_KEY)
+        .config("spark.hadoop.fs.s3a.secret.key", Config.S3_SECRET_KEY)
         # Con SDK v2, forzar proveedor de claves estáticas
         # Sin esto, SDK v2 busca IAM roles de AWS real → falla en local
         .config(
             "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
         )
-        
         # Lee TIMESTAMP(NANOS) como Long en lugar de fallar
         .config("spark.sql.legacy.parquet.nanosAsLong", "true")
-
         .getOrCreate()
     )
+
 
 # --- Función de limpieza ---
 def stop_spark_session(spark: SparkSession) -> None:

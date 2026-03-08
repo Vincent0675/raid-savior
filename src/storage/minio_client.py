@@ -4,6 +4,7 @@ import boto3
 from botocore.exceptions import ClientError
 from typing import Any
 
+
 class MinIOStorageClient:
     """
     Cliente wrapper para MinIO/S3 enfocado en la capa Bronze y Silver.
@@ -24,10 +25,12 @@ class MinIOStorageClient:
             endpoint_url=self.endpoint_url,
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
-            region_name="us-east-1"  # MinIO ignora esto, pero boto3 lo pide
+            region_name="us-east-1",  # MinIO ignora esto, pero boto3 lo pide
         )
 
-    def calculate_object_key(self, raidid: str, ingest_timestamp: str, batch_id: str) -> str:
+    def calculate_object_key(
+        self, raidid: str, ingest_timestamp: str, batch_id: str
+    ) -> str:
         """
         Calcula la ruta determinista donde vivirá el archivo en Bronze.
         Pattern: wow_raid_events/v1/raidid=<id>/ingest_date=<YYYY-MM-DD>/batch_<uuid>.json
@@ -47,7 +50,7 @@ class MinIOStorageClient:
         key = self.calculate_object_key(raidid, ingest_timestamp, batch_id)
 
         # 2. Serializar a JSON (bytes)
-        body_bytes = json.dumps(batch_data, default=str).encode('utf-8')
+        body_bytes = json.dumps(batch_data, default=str).encode("utf-8")
 
         try:
             self.s3.put_object(
@@ -58,11 +61,11 @@ class MinIOStorageClient:
                 Metadata={
                     "source": "wow-telemetry-pipeline",
                     "layer": "bronze",
-                    "raidid": raidid
-                }
+                    "raidid": raidid,
+                },
             )
             return {"status": "success", "s3_path": f"s3://{self.bucket}/{key}"}
-        
+
         except ClientError as err:
             # Aquí podrías loguear el error real
             raise ConnectionError(f"Error escribiendo en MinIO: {err}") from err
@@ -76,11 +79,20 @@ class MinIOStorageClient:
         """
         try:
             response = self.s3.get_object(Bucket=bucket_name, Key=object_name)
-            return response['Body']
+            return response["Body"]
         except ClientError as err:
-            raise FileNotFoundError(f"No se pudo leer {object_name} de {bucket_name}: {err}") from err
+            raise FileNotFoundError(
+                f"No se pudo leer {object_name} de {bucket_name}: {err}"
+            ) from err
 
-    def put_object(self, bucket_name: str, object_name: str, data: Any, length: int, content_type: str = "application/octet-stream"):
+    def put_object(
+        self,
+        bucket_name: str,
+        object_name: str,
+        data: Any,
+        length: int,
+        content_type: str = "application/octet-stream",
+    ):
         """
         Método genérico para escribir cualquier tipo de dato (Parquet, JSON, etc.)
         """
@@ -90,30 +102,32 @@ class MinIOStorageClient:
                 Key=object_name,
                 Body=data,
                 ContentLength=length,
-                ContentType=content_type
+                ContentType=content_type,
             )
         except ClientError as err:
-            raise ConnectionError(f"Error escribiendo {object_name} en {bucket_name}: {err}") from err
-        
+            raise ConnectionError(
+                f"Error escribiendo {object_name} en {bucket_name}: {err}"
+            ) from err
+
     def list_objects(self, bucket: str, prefix: str) -> list:
         """
         Lista objetos en un bucket con un prefijo dado.
-        
+
         Args:
             bucket: Nombre del bucket
             prefix: Prefijo de ruta (ej. "wow_raid_events/v1/raid_id=raid001/")
-        
+
         Returns:
             Lista de keys (strings) de objetos que coinciden con el prefijo
         """
         try:
             response = self.s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-            
-            if 'Contents' not in response:
+
+            if "Contents" not in response:
                 return []
-            
-            return [obj['Key'] for obj in response['Contents']]
-        
+
+            return [obj["Key"] for obj in response["Contents"]]
+
         except Exception as e:
             print(f"Error listando objetos en {bucket}/{prefix}: {e}")
             return []

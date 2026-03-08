@@ -2,6 +2,7 @@ import pandas as pd
 
 from src.analytics.aggregators import build_raid_summary, build_player_raid_stats
 
+
 def test_build_raid_summary_simple_success():
     # 1. DataFrame Silver mínimo con una sola raid
     data = [
@@ -75,7 +76,6 @@ def test_build_raid_summary_simple_success():
     # Métricas derivadas
     assert row["boss_min_hp_pct"] == 0.0
     assert row["raid_outcome"] == "success"
-
 
 
 def test_build_raid_summary_wipe_case():
@@ -182,10 +182,10 @@ def test_build_raid_summary_wipe_case():
     assert row["n_healers"] == 1
     assert row["n_dps"] == 1
 
-
     # boss_min_hp_pct alto y resultado wipe
     assert row["boss_min_hp_pct"] == 50.0
     assert row["raid_outcome"] == "wipe"
+
 
 def test_build_player_raid_stats_simple():
     # Mismo Silver que en el test success anterior
@@ -239,18 +239,18 @@ def test_build_player_raid_stats_simple():
             "is_critical_hit": False,
         },
     ]
-    
+
     df_silver = pd.DataFrame(data)
-    
+
     # Primero construir raid_summary
     raid_summary = build_raid_summary(df_silver)
-    
+
     # Ahora player_raid_stats
     player_stats = build_player_raid_stats(df_silver, raid_summary)
-    
+
     # Comprobaciones
     assert len(player_stats) == 2  # 2 jugadores
-    
+
     # Jugador 1 (Alice, dps)
     alice = player_stats[player_stats["player_id"] == "player1"].iloc[0]
     assert alice["player_name"] == "Alice"
@@ -259,7 +259,7 @@ def test_build_player_raid_stats_simple():
     assert alice["healing_total"] == 0.0
     assert alice["player_deaths"] == 0
     assert alice["dps"] > 0  # algún valor positivo
-    
+
     # Jugador 2 (Bob, healer)
     bob = player_stats[player_stats["player_id"] == "player2"].iloc[0]
     assert bob["player_name"] == "Bob"

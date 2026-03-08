@@ -49,9 +49,9 @@ logger = logging.getLogger(__name__)
 # Cada tabla tiene su propio prefijo raíz.
 # Dentro, se particiona por raid_id y event_date (Hive-style).
 _PATH_TEMPLATES: dict[str, str] = {
-    "dim_player":             "dim_player/player_id={player_id}/dim_player.parquet",
-    "dim_raid":               "dim_raid/raid_id={raid_id}/dim_raid.parquet",
-    "fact_raid_summary":      "fact_raid_summary/raid_id={raid_id}/event_date={event_date}/fact_raid_summary.parquet",
+    "dim_player": "dim_player/player_id={player_id}/dim_player.parquet",
+    "dim_raid": "dim_raid/raid_id={raid_id}/dim_raid.parquet",
+    "fact_raid_summary": "fact_raid_summary/raid_id={raid_id}/event_date={event_date}/fact_raid_summary.parquet",
     "fact_player_raid_stats": "fact_player_raid_stats/raid_id={raid_id}/event_date={event_date}/fact_player_raid_stats.parquet",
 }
 
@@ -60,7 +60,10 @@ _PATH_TEMPLATES: dict[str, str] = {
 # HELPER: validación de DataFrame contra schema Pydantic
 # ============================================================================
 
-def _validate_dataframe(df: pd.DataFrame, schema: type[BaseModel], table_name: str) -> None:
+
+def _validate_dataframe(
+    df: pd.DataFrame, schema: type[BaseModel], table_name: str
+) -> None:
     """
     Valida cada fila de un DataFrame contra un schema Pydantic v2.
 
@@ -79,7 +82,9 @@ def _validate_dataframe(df: pd.DataFrame, schema: type[BaseModel], table_name: s
         try:
             schema.model_validate(row.to_dict())
         except ValidationError as exc:
-            errors.append(f"  Fila {idx}: {exc.error_count()} error(s) → {exc.errors(include_url=False)}")
+            errors.append(
+                f"  Fila {idx}: {exc.error_count()} error(s) → {exc.errors(include_url=False)}"
+            )
 
     if errors:
         error_summary = "\n".join(errors)
@@ -94,6 +99,7 @@ def _validate_dataframe(df: pd.DataFrame, schema: type[BaseModel], table_name: s
 # ============================================================================
 # CLASE PRINCIPAL
 # ============================================================================
+
 
 class GoldLayerETL:
     """
@@ -170,7 +176,8 @@ class GoldLayerETL:
         if failed:
             logger.warning(
                 "[read_silver_partition] %d objeto(s) saltados por error: %s",
-                len(failed), failed,
+                len(failed),
+                failed,
             )
 
         df_result = pd.concat(dfs, ignore_index=True)
@@ -206,8 +213,7 @@ class GoldLayerETL:
         logger.debug("[dim_player] Construyendo dimensión de jugadores...")
 
         dim = (
-            df_silver
-            .groupby("source_player_id", as_index=False)
+            df_silver.groupby("source_player_id", as_index=False)
             .agg(
                 player_name=("source_player_name", "first"),
                 player_class=("source_player_class", "first"),
@@ -226,18 +232,24 @@ class GoldLayerETL:
         for col in ("first_seen_date", "last_seen_date"):
             dim[col] = pd.to_datetime(dim[col]).dt.date
         null_class = dim["player_class"].isna().sum()
-        null_role  = dim["player_role"].isna().sum()
+        null_role = dim["player_role"].isna().sum()
         if null_class > 0:
-            logger.warning("[dim_player] %d jugador(es) sin player_class en Silver → 'unknown'", null_class)
+            logger.warning(
+                "[dim_player] %d jugador(es) sin player_class en Silver → 'unknown'",
+                null_class,
+            )
         if null_role > 0:
-            logger.warning("[dim_player] %d jugador(es) sin player_role en Silver → 'unknown'", null_role)
+            logger.warning(
+                "[dim_player] %d jugador(es) sin player_role en Silver → 'unknown'",
+                null_role,
+            )
 
         dim["player_class"] = dim["player_class"].fillna("unknown")
-        dim["player_role"]  = dim["player_role"].fillna("unknown")
+        dim["player_role"] = dim["player_role"].fillna("unknown")
 
         logger.debug("[dim_player] %d jugadores únicos.", len(dim))
         return dim
-    
+
     def _upsert_dim_player(
         self,
         new_dim: pd.DataFrame,
@@ -264,12 +276,16 @@ class GoldLayerETL:
         merged["first_seen_date"] = merged[
             ["first_seen_date_existing", "first_seen_date_new"]
         ].min(axis=1)
-        merged.drop(columns=["first_seen_date_existing", "first_seen_date_new"], inplace=True)
+        merged.drop(
+            columns=["first_seen_date_existing", "first_seen_date_new"], inplace=True
+        )
 
         merged["last_seen_date"] = merged[
             ["last_seen_date_existing", "last_seen_date_new"]
         ].max(axis=1)
-        merged.drop(columns=["last_seen_date_existing", "last_seen_date_new"], inplace=True)
+        merged.drop(
+            columns=["last_seen_date_existing", "last_seen_date_new"], inplace=True
+        )
 
         merged["total_raids"] = (
             merged["total_raids_existing"].fillna(0)
@@ -282,8 +298,6 @@ class GoldLayerETL:
             len(merged),
         )
         return merged.reset_index(drop=True)
-
-
 
     def _build_dim_raid(
         self,
@@ -311,14 +325,18 @@ class GoldLayerETL:
 
         n_players = int(raid_summary["n_players"].iloc[0])
 
-        dim = pd.DataFrame([{
-            "raid_id":            raid_id,
-            "event_date":         pd.to_datetime(event_date).date(),
-            "boss_name":          "Unknown Boss",   # placeholder Fase 4
-            "difficulty":         "Normal",          # placeholder Fase 4
-            "raid_size":          n_players,
-            "duration_target_ms": 360_000.0,         # 6 min — regla de negocio actual
-        }])
+        dim = pd.DataFrame(
+            [
+                {
+                    "raid_id": raid_id,
+                    "event_date": pd.to_datetime(event_date).date(),
+                    "boss_name": "Unknown Boss",  # placeholder Fase 4
+                    "difficulty": "Normal",  # placeholder Fase 4
+                    "raid_size": n_players,
+                    "duration_target_ms": 360_000.0,  # 6 min — regla de negocio actual
+                }
+            ]
+        )
 
         logger.debug("[dim_raid] dim_raid construida: %s", dim.to_dict("records"))
         return dim
@@ -375,50 +393,63 @@ class GoldLayerETL:
                 Key=_PATH_TEMPLATES["dim_player"].format(player_id="all"),
             )
             existing_dim = pd.read_parquet(io.BytesIO(response["Body"].read()))
-            logger.info("[dim_player] Existente encontrado: %d jugadores → aplicando upsert.", len(existing_dim))
+            logger.info(
+                "[dim_player] Existente encontrado: %d jugadores → aplicando upsert.",
+                len(existing_dim),
+            )
             dim_player = self._upsert_dim_player(dim_player, existing_dim)
         except self.storage.s3.exceptions.NoSuchKey:
             logger.info("[dim_player] Primera escritura — no hay existente previo.")
-            
-        raid_id    = str(fact_raid_summary["raid_id"].iloc[0])
+
+        raid_id = str(fact_raid_summary["raid_id"].iloc[0])
         event_date = str(fact_raid_summary["event_date"].iloc[0])
 
-        logger.info("[write_gold_tables] Iniciando escritura Gold para %s / %s", raid_id, event_date)
+        logger.info(
+            "[write_gold_tables] Iniciando escritura Gold para %s / %s",
+            raid_id,
+            event_date,
+        )
 
         # Validar ANTES de escribir (fail-fast)
         logger.info("[write_gold_tables] Validando schemas...")
-        _validate_dataframe(dim_player,           DimPlayerSchema,           "dim_player")
-        _validate_dataframe(dim_raid,             DimRaidSchema,             "dim_raid")
-        _validate_dataframe(fact_raid_summary,    FactRaidSummarySchema,     "fact_raid_summary")
-        _validate_dataframe(fact_player_raid_stats, FactPlayerRaidStatsSchema, "fact_player_raid_stats")
+        _validate_dataframe(dim_player, DimPlayerSchema, "dim_player")
+        _validate_dataframe(dim_raid, DimRaidSchema, "dim_raid")
+        _validate_dataframe(
+            fact_raid_summary, FactRaidSummarySchema, "fact_raid_summary"
+        )
+        _validate_dataframe(
+            fact_player_raid_stats, FactPlayerRaidStatsSchema, "fact_player_raid_stats"
+        )
         logger.info("[write_gold_tables] Todos los schemas OK.")
 
         # Paths usando las constantes de contrato
         keys = {
-            "dim_player":             _PATH_TEMPLATES["dim_player"].format(player_id="all"),
-            "dim_raid":               _PATH_TEMPLATES["dim_raid"].format(raid_id=raid_id),
-            "fact_raid_summary":      _PATH_TEMPLATES["fact_raid_summary"].format(
-                                          raid_id=raid_id, event_date=event_date),
+            "dim_player": _PATH_TEMPLATES["dim_player"].format(player_id="all"),
+            "dim_raid": _PATH_TEMPLATES["dim_raid"].format(raid_id=raid_id),
+            "fact_raid_summary": _PATH_TEMPLATES["fact_raid_summary"].format(
+                raid_id=raid_id, event_date=event_date
+            ),
             "fact_player_raid_stats": _PATH_TEMPLATES["fact_player_raid_stats"].format(
-                                          raid_id=raid_id, event_date=event_date),
+                raid_id=raid_id, event_date=event_date
+            ),
         }
 
-        self._write_parquet(dim_player,             keys["dim_player"])
-        self._write_parquet(dim_raid,               keys["dim_raid"])
-        self._write_parquet(fact_raid_summary,      keys["fact_raid_summary"])
+        self._write_parquet(dim_player, keys["dim_player"])
+        self._write_parquet(dim_raid, keys["dim_raid"])
+        self._write_parquet(fact_raid_summary, keys["fact_raid_summary"])
         self._write_parquet(fact_player_raid_stats, keys["fact_player_raid_stats"])
 
         return {
-            "raid_id":                    raid_id,
-            "event_date":                 event_date,
-            "dim_player_path":            f"s3://{self.gold_bucket}/{keys['dim_player']}",
-            "dim_raid_path":              f"s3://{self.gold_bucket}/{keys['dim_raid']}",
-            "fact_raid_summary_path":     f"s3://{self.gold_bucket}/{keys['fact_raid_summary']}",
-            "fact_player_stats_path":     f"s3://{self.gold_bucket}/{keys['fact_player_raid_stats']}",
-            "dim_player_rows":            len(dim_player),
-            "dim_raid_rows":              len(dim_raid),
-            "fact_raid_summary_rows":     len(fact_raid_summary),
-            "fact_player_stats_rows":     len(fact_player_raid_stats),
+            "raid_id": raid_id,
+            "event_date": event_date,
+            "dim_player_path": f"s3://{self.gold_bucket}/{keys['dim_player']}",
+            "dim_raid_path": f"s3://{self.gold_bucket}/{keys['dim_raid']}",
+            "fact_raid_summary_path": f"s3://{self.gold_bucket}/{keys['fact_raid_summary']}",
+            "fact_player_stats_path": f"s3://{self.gold_bucket}/{keys['fact_player_raid_stats']}",
+            "dim_player_rows": len(dim_player),
+            "dim_raid_rows": len(dim_raid),
+            "fact_raid_summary_rows": len(fact_raid_summary),
+            "fact_player_stats_rows": len(fact_player_raid_stats),
         }
 
     # ------------------------------------------------------------------ #
@@ -445,8 +476,10 @@ class GoldLayerETL:
         RuntimeError si falla la lectura de Silver o la escritura en Gold.
         """
         logger.info(
-            "=" * 60 + "\n[Gold ETL] Iniciando pipeline para raid_id=%s / event_date=%s",
-            raid_id, event_date,
+            "=" * 60
+            + "\n[Gold ETL] Iniciando pipeline para raid_id=%s / event_date=%s",
+            raid_id,
+            event_date,
         )
 
         try:
@@ -455,18 +488,25 @@ class GoldLayerETL:
 
             # ── 2. Normalizar nombres de columnas ─────────────────────────
 
-            df_silver = df_silver[df_silver["source_player_id"].str.startswith("player_")].copy()
-            logger.info("[Gold ETL] Eventos de jugadores reales tras filtro: %d", len(df_silver))   
+            df_silver = df_silver[
+                df_silver["source_player_id"].str.startswith("player_")
+            ].copy()
+            logger.info(
+                "[Gold ETL] Eventos de jugadores reales tras filtro: %d", len(df_silver)
+            )
 
             logger.info("[Gold ETL] Silver leído: %d eventos.", len(df_silver))
 
             # ── 3. Construir tablas de hechos ─────────────────────────────
-            fact_raid_summary      = build_raid_summary(df_silver)
-            fact_player_raid_stats = build_player_raid_stats(df_silver, fact_raid_summary)
+            fact_raid_summary = build_raid_summary(df_silver)
+            fact_player_raid_stats = build_player_raid_stats(
+                df_silver, fact_raid_summary
+            )
 
             logger.info(
                 "[Gold ETL] Agregaciones OK — raids: %d | jugadores: %d",
-                len(fact_raid_summary), len(fact_player_raid_stats),
+                len(fact_raid_summary),
+                len(fact_player_raid_stats),
             )
 
             for col in ("player_class", "player_role"):
@@ -474,14 +514,17 @@ class GoldLayerETL:
                     nulls = fact_player_raid_stats[col].isna().sum()
                     if nulls > 0:
                         logger.warning(
-                            "[fact_player_raid_stats] %d fila(s) con '%s' nulo → 'unknown'", nulls, col
+                            "[fact_player_raid_stats] %d fila(s) con '%s' nulo → 'unknown'",
+                            nulls,
+                            col,
                         )
-                    fact_player_raid_stats[col] = fact_player_raid_stats[col].fillna("unknown")
+                    fact_player_raid_stats[col] = fact_player_raid_stats[col].fillna(
+                        "unknown"
+                    )
 
-                    
             # ── 4. Construir dimensiones ──────────────────────────────────
             dim_player = self._build_dim_player(df_silver)
-            dim_raid   = self._build_dim_raid(raid_id, event_date, fact_raid_summary)
+            dim_raid = self._build_dim_raid(raid_id, event_date, fact_raid_summary)
 
             # ── 5. Alinear tipos para Pydantic ────────────────────────────
             # event_date en facts debe ser tipo date, no string ni Timestamp
@@ -522,7 +565,7 @@ class GoldLayerETL:
         -------
         Lista de tuplas (raid_id, event_date) ordenadas alfabéticamente.
         """
-        prefix  = "wow_raid_events/v1/"
+        prefix = "wow_raid_events/v1/"
         objects = self.storage.list_objects(self.silver_bucket, prefix)
 
         if not objects:
@@ -537,21 +580,21 @@ class GoldLayerETL:
             # Ej: wow_raid_events/v1/raid_id=raid001/event_date=2026-02-25/part-xxx.parquet
             segments = key.split("/")
 
-            raid_seg  = next((s for s in segments if s.startswith("raid_id=")),    None)
-            date_seg  = next((s for s in segments if s.startswith("event_date=")), None)
+            raid_seg = next((s for s in segments if s.startswith("raid_id=")), None)
+            date_seg = next((s for s in segments if s.startswith("event_date=")), None)
 
             if raid_seg and date_seg:
-                raid_id    = raid_seg.split("=", 1)[1]
+                raid_id = raid_seg.split("=", 1)[1]
                 event_date = date_seg.split("=", 1)[1]
                 partitions.add((raid_id, event_date))
 
         discovered = sorted(partitions)
         logger.info(
             "[discover_silver_partitions] %d partición(es) encontrada(s): %s",
-            len(discovered), discovered,
+            len(discovered),
+            discovered,
         )
         return discovered
-
 
     def run_all(self) -> dict[str, Any]:
         """
@@ -572,12 +615,15 @@ class GoldLayerETL:
         )
 
         results: list[dict] = []
-        errors:  list[dict] = []
+        errors: list[dict] = []
 
         for i, (raid_id, event_date) in enumerate(partitions, start=1):
             logger.info(
                 "[Gold ETL run_all] (%d/%d) Procesando raid_id=%s / event_date=%s",
-                i, len(partitions), raid_id, event_date,
+                i,
+                len(partitions),
+                raid_id,
+                event_date,
             )
             try:
                 result = self.run_for_partition(raid_id, event_date)
@@ -585,23 +631,28 @@ class GoldLayerETL:
             except Exception as exc:
                 logger.error(
                     "[Gold ETL run_all] FALLO en %s/%s: %s",
-                    raid_id, event_date, exc,
+                    raid_id,
+                    event_date,
+                    exc,
                 )
-                errors.append({
-                    "raid_id":    raid_id,
-                    "event_date": event_date,
-                    "error":      str(exc),
-                })
+                errors.append(
+                    {
+                        "raid_id": raid_id,
+                        "event_date": event_date,
+                        "error": str(exc),
+                    }
+                )
 
         summary = {
             "total_partitions": len(partitions),
-            "successful":       len(results),
-            "failed":           len(errors),
-            "results":          results,
-            "errors":           errors,
+            "successful": len(results),
+            "failed": len(errors),
+            "results": results,
+            "errors": errors,
         }
         logger.info(
             "[Gold ETL run_all] Batch completado — %d OK / %d FAIL",
-            len(results), len(errors),
+            len(results),
+            len(errors),
         )
         return summary

@@ -86,3 +86,4 @@ dagster_home
 # Dev tools
 .ruff_cache
 .mypy_cache
+.coverage

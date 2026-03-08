@@ -8,14 +8,19 @@ from typing import Any
 from collections.abc import Sequence
 import uuid
 
-from src.generators.raid_event_generator import WoWEventGenerator, RaidSession, WoWRaidEvent
+from src.generators.raid_event_generator import (
+    WoWEventGenerator,
+    RaidSession,
+    WoWRaidEvent,
+)
+
 
 def build_raid_events(
-        generator: WoWEventGenerator,
-        raid_id: str,
-        num_players: int,
-        duration_s: int,
-        num_events:int,
+    generator: WoWEventGenerator,
+    raid_id: str,
+    num_players: int,
+    duration_s: int,
+    num_events: int,
 ) -> list["WoWRaidEvent"]:
     """
     Crea una RaidSession y genera num_events eventos para esa raid.
@@ -24,14 +29,16 @@ def build_raid_events(
         raid_id=raid_id,
         num_players=num_players,
         duration_s=duration_s,
-        start_time=None, # Por ahora usa el default (ahora-1h) ya definido
+        start_time=None,  # Por ahora usa el default (ahora-1h) ya definido
         boss_name="Ragnaros",
     )
     events = generator.generate_events(session=session, num_events=num_events)
-    print(f"Raid {raid_id}: eventos generados = {len(events)}; "
-      f"raid_ids únicos en esos eventos = "
-      f"{set(e.raid_id for e in events)}")
-    return events # Esto solo orquesta el generate_raid_session y generate_events que ya se tienen
+    print(
+        f"Raid {raid_id}: eventos generados = {len(events)}; "
+        f"raid_ids únicos en esos eventos = "
+        f"{set(e.raid_id for e in events)}"
+    )
+    return events  # Esto solo orquesta el generate_raid_session y generate_events que ya se tienen
 
 
 def chunk_events(events, batch_size: int):
@@ -39,12 +46,15 @@ def chunk_events(events, batch_size: int):
     Generador que devuelve lisas de eventos de tamaño <= batch_size.
     """
     for i in range(0, len(events), batch_size):
-        yield events[i:i + batch_size] # Más adelante se añadirá controles de RAM, por ahora simplemente troceamos la lista.
+        yield events[
+            i : i + batch_size
+        ]  # Más adelante se añadirá controles de RAM, por ahora simplemente troceamos la lista.
+
 
 def send_batch_http(
-        events_batch,
-        receiver_url: str,
-        batch_source: str = "massive-generator-v1",
+    events_batch,
+    receiver_url: str,
+    batch_source: str = "massive-generator-v1",
 ):
     """
     Envía un batch al receptor HTTP /events y devuelve (status_code, json_response).
@@ -57,6 +67,7 @@ def send_batch_http(
     except Exception:
         pass
     return resp.status_code, data
+
 
 def write_batch_file(
     events_batch: Sequence,
@@ -85,7 +96,10 @@ def write_batch_file(
 
     return path
 
-def append_run_record(record: dict[str, Any], catalog_path: str = "data/run_catalog.jsonl") -> None:
+
+def append_run_record(
+    record: dict[str, Any], catalog_path: str = "data/run_catalog.jsonl"
+) -> None:
     """
     Añade un registro de ejecución (run) al catálogo en formato JSONL.
     Crea el directorio si no existe.
@@ -96,6 +110,7 @@ def append_run_record(record: dict[str, Any], catalog_path: str = "data/run_cata
     with open(catalog_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--num-raids", type=int, default=1)
@@ -103,7 +118,9 @@ def main():
     parser.add_argument("--num-players", type=int, default=20)
     parser.add_argument("--duration-s", type=int, default=300)
     parser.add_argument("--batch-size", type=int, default=500)
-    parser.add_argument("--receiver-url", type=str, default="http://localhost:5000/events")
+    parser.add_argument(
+        "--receiver-url", type=str, default="http://localhost:5000/events"
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--output-mode",
@@ -126,7 +143,7 @@ def main():
     t0 = time.time()
 
     for raid_index in range(args.num_raids):
-        raid_id = f"raid{raid_index+1:03d}"
+        raid_id = f"raid{raid_index + 1:03d}"
         events = build_raid_events(
             generator=generator,
             raid_id=raid_id,
@@ -154,10 +171,12 @@ def main():
                     # No hacemos return aquí, porque el HTTP fue exitoso
 
                 # Mostrar el status del JSON para trazabilidad
-                response_status = data.get('status', 'N/A') if data else 'N/A'
-                batch_id = data.get('batch_id', 'N/A') if data else 'N/A'
-                
-                print(f"[OK][HTTP] raid={raid_id} batch_event_count={len(batch)} http_status={status} response_status={response_status} batch_id={batch_id}")
+                response_status = data.get("status", "N/A") if data else "N/A"
+                batch_id = data.get("batch_id", "N/A") if data else "N/A"
+
+                print(
+                    f"[OK][HTTP] raid={raid_id} batch_event_count={len(batch)} http_status={status} response_status={response_status} batch_id={batch_id}"
+                )
 
             elif args.output_mode == "offline":
                 path = write_batch_file(
@@ -166,13 +185,15 @@ def main():
                     raid_id=raid_id,
                     batch_index=batch_index,
                 )
-                print(f"[OK][FILE] raid={raid_id} batch_event_count={len(batch)} path={path}")
+                print(
+                    f"[OK][FILE] raid={raid_id} batch_event_count={len(batch)} path={path}"
+                )
 
             total_events_sent += len(batch)
 
     elapsed = time.time() - t0
     print(f"Eventos enviados/generados: {total_events_sent}")
-    print(f"Tiempo total: {elapsed:.2f}s  ->  {total_events_sent/elapsed:.1f} ev/s")
+    print(f"Tiempo total: {elapsed:.2f}s  ->  {total_events_sent / elapsed:.1f} ev/s")
 
     # ===== Registro en el catálogo de runs =====
     t_start_utc = datetime.fromtimestamp(t0, tz=timezone.utc).isoformat()
@@ -202,7 +223,8 @@ def main():
 
     append_run_record(record)
     print(f"[CATALOG] Run registrado con run_id={run_id}")
-    
+
+
 if __name__ == "__main__":
     print(">>> generate_massive_http: main() iniciado")
     main()

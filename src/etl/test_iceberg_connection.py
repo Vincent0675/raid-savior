@@ -1,5 +1,6 @@
 from src.etl.spark_session import get_spark_session, stop_spark_session
 
+
 def main():
     print(">>> SCRIPT INICIADO")
     spark = get_spark_session("IcebergConnectionTest")
@@ -32,12 +33,10 @@ def main():
     snapshot_v1_id = 5516511019615884241  # ← tu snapshot_id del primero
 
     print("\n── Time Travel → Snapshot 1 (solo primer INSERT) ──")
-    spark.read \
-        .option("snapshot-id", snapshot_v1_id) \
-        .table("wow.gold.ping_test") \
-        .show()
+    spark.read.option("snapshot-id", snapshot_v1_id).table("wow.gold.ping_test").show()
 
     stop_spark_session(spark)
+
 
 if __name__ == "__main__":
     try:

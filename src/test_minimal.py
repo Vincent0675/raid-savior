@@ -2,6 +2,7 @@ print(">>> PASO 1: Python funciona")
 
 try:
     from src.etl.spark_session import get_spark_session
+
     print(">>> PASO 2: Import OK")
 except Exception as e:
     print(f">>> PASO 2 FALLÓ: {e}")

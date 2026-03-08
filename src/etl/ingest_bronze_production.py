@@ -26,10 +26,10 @@ from tqdm import tqdm
 from src.storage.minio_client import MinIOStorageClient
 
 # ── Configuración ─────────────────────────────────────────────────────────
-BRONZE_ROOT  = Path("data/bronze/production")
-BUCKET       = "bronze"
-S3_PREFIX    = "wow_raid_events/v1"
-INGEST_DATE  = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+BRONZE_ROOT = Path("data/bronze/production")
+BUCKET = "bronze"
+S3_PREFIX = "wow_raid_events/v1"
+INGEST_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def ensure_bucket(storage: MinIOStorageClient, bucket: str) -> None:
@@ -109,7 +109,7 @@ def main(dry_run: bool = False) -> None:
 
     # ── Subir archivos ─────────────────────────────────────────────────────
     success = 0
-    failed  = 0
+    failed = 0
     total_bytes = 0
 
     with tqdm(total=len(files), desc="Subiendo a Bronze", unit="archivo") as pbar:
@@ -123,13 +123,13 @@ def main(dry_run: bool = False) -> None:
                     Body=raw_bytes,
                     ContentType="application/json",
                     Metadata={
-                        "raid-id":        raid_id,
-                        "ingest-date":    INGEST_DATE,
-                        "source-file":    fpath.name,
-                        "source-system":  "ingest_bronze_production.py",
+                        "raid-id": raid_id,
+                        "ingest-date": INGEST_DATE,
+                        "source-file": fpath.name,
+                        "source-system": "ingest_bronze_production.py",
                     },
                 )
-                success     += 1
+                success += 1
                 total_bytes += len(raw_bytes)
 
             except Exception as e:
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Muestra qué se subiría sin ejecutar nada"
+        help="Muestra qué se subiría sin ejecutar nada",
     )
     args = parser.parse_args()
     main(dry_run=args.dry_run)

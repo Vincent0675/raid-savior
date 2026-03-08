@@ -18,7 +18,7 @@ from src.schemas.eventos_schema import (
     PlayerClass,
     DamageSchool,
     EntityType,
-    ResourceType
+    ResourceType,
 )
 
 
@@ -40,9 +40,9 @@ def test_valid_combat_damage_event():
         ability_school=DamageSchool.FIRE,
         damage_amount=15000.0,
         is_critical_hit=True,
-        critical_multiplier=1.5
+        critical_multiplier=1.5,
     )
-    
+
     assert event.event_type == EventType.COMBAT_DAMAGE
     assert event.damage_amount == 15000.0
     assert event.is_critical_hit is True
@@ -60,7 +60,7 @@ def test_invalid_damage_event_without_damage():
             source_player_name="Thrall",
             # damage_amount falta! ❌
         )
-    
+
     errors = exc_info.value.errors()
     assert any("damage_amount" in str(e) for e in errors)
     print("✅ Test passed: combat_damage without damage rejected")
@@ -69,7 +69,7 @@ def test_invalid_damage_event_without_damage():
 def test_timestamp_in_future_rejected():
     """Test: Timestamp en el futuro debe ser rechazado."""
     future_time = datetime.now(timezone.utc) + timedelta(hours=1)
-    
+
     with pytest.raises(ValidationError) as exc_info:
         WoWRaidEvent(
             event_type=EventType.HEAL,
@@ -77,9 +77,9 @@ def test_timestamp_in_future_rejected():
             raid_id="raid001",
             source_player_id="player456",
             source_player_name="Morissa",
-            healing_amount=8500.0
+            healing_amount=8500.0,
         )
-    
+
     errors = exc_info.value.errors()
     assert any("future" in str(e).lower() for e in errors)
     print("✅ Test passed: Future timestamp rejected")
@@ -101,9 +101,9 @@ def test_valid_heal_event():
         ability_name="Healing Touch",
         ability_school=DamageSchool.HOLY,
         healing_amount=8500.0,
-        is_critical_hit=False
+        is_critical_hit=False,
     )
-    
+
     assert event.healing_amount == 8500.0
     print("✅ Test passed: Valid heal event")
 
@@ -116,9 +116,9 @@ def test_invalid_raid_id_format():
             timestamp=datetime.now(timezone.utc),
             raid_id="invalid_raid",  # ❌ No cumple patrón raid\d{3}
             source_player_id="player789",
-            source_player_name="Uther"
+            source_player_name="Uther",
         )
-    
+
     errors = exc_info.value.errors()
     assert any("raid_id" in str(e) or "pattern" in str(e) for e in errors)
     print("✅ Test passed: Invalid raid_id format rejected")
@@ -136,9 +136,9 @@ def test_valid_mana_regeneration_event():
         resource_type=ResourceType.MANA,
         resource_amount_before=5000.0,
         resource_amount_after=6000.0,
-        resource_regeneration_rate=50.0
+        resource_regeneration_rate=50.0,
     )
-    
+
     assert event.resource_type == ResourceType.MANA
     assert event.resource_amount_after is not None
     assert event.resource_amount_before is not None
@@ -155,11 +155,13 @@ def test_extra_fields_rejected():
             raid_id="raid001",
             source_player_id="player123",
             source_player_name="Thrall",
-            invalid_extra_field="should_fail"  # type: ignore[call-arg] # intencional test extra='forbid'
+            invalid_extra_field="should_fail",  # type: ignore[call-arg] # intencional test extra='forbid'
         )
-    
+
     errors = exc_info.value.errors()
-    assert any("extra" in str(e).lower() or "forbidden" in str(e).lower() for e in errors)
+    assert any(
+        "extra" in str(e).lower() or "forbidden" in str(e).lower() for e in errors
+    )
     print("✅ Test passed: Extra fields rejected")
 
 

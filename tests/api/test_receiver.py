@@ -15,7 +15,7 @@ from src.generators.raid_event_generator import WoWEventGenerator
 def client():
     """Flask test client."""
     app = create_app()
-    app.config['TESTING'] = True
+    app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
 
@@ -34,26 +34,24 @@ def sample_events():
 
 def test_health_check(client):
     """Test health endpoint."""
-    response = client.get('/health')
-    
+    response = client.get("/health")
+
     assert response.status_code == 200
     data = response.get_json()
-    assert data['status'] == 'healthy'
-    assert 'timestamp' in data
+    assert data["status"] == "healthy"
+    assert "timestamp" in data
 
 
 def test_post_valid_events(client, sample_events):
     """Test POST with valid events."""
     response = client.post(
-        '/events',
-        data=json.dumps(sample_events),
-        content_type='application/json'
+        "/events", data=json.dumps(sample_events), content_type="application/json"
     )
-    
+
     assert response.status_code == 201
     data = response.get_json()
-    assert data['status'] == 'accepted'
-    assert data['events_received'] == len(sample_events)
+    assert data["status"] == "accepted"
+    assert data["events_received"] == len(sample_events)
 
 
 def test_post_invalid_event(client):
@@ -64,40 +62,32 @@ def test_post_invalid_event(client):
             # Missing required fields: timestamp, raid_id, etc.
         }
     ]
-    
+
     response = client.post(
-        '/events',
-        data=json.dumps(invalid_payload),
-        content_type='application/json'
+        "/events", data=json.dumps(invalid_payload), content_type="application/json"
     )
-    
+
     assert response.status_code == 400
     data = response.get_json()
-    assert data['status'] == 'validation_failed'
-    assert data['invalid_count'] == 1
+    assert data["status"] == "validation_failed"
+    assert data["invalid_count"] == 1
 
 
 def test_post_empty_payload(client):
     """Test POST with empty array."""
     response = client.post(
-        '/events',
-        data=json.dumps([]),
-        content_type='application/json'
+        "/events", data=json.dumps([]), content_type="application/json"
     )
-    
+
     assert response.status_code == 400
     data = response.get_json()
-    assert 'error' in data
+    assert "error" in data
 
 
 def test_post_non_json(client):
     """Test POST with non-JSON content."""
-    response = client.post(
-        '/events',
-        data="not json",
-        content_type='text/plain'
-    )
-    
+    response = client.post("/events", data="not json", content_type="text/plain")
+
     assert response.status_code == 400
     data = response.get_json()
-    assert 'error' in data
+    assert "error" in data

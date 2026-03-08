@@ -4,10 +4,10 @@ from dagster import asset, AssetExecutionContext, MaterializeResult, MetadataVal
 @asset(
     group_name="medallion",
     deps=["bronze_raw_events"],
-    description="ETL Bronze → Silver: transforma JSON raw a Parquet+Snappy particionado"
+    description="ETL Bronze → Silver: transforma JSON raw a Parquet+Snappy particionado",
 )
 def silver_events(context: AssetExecutionContext) -> MaterializeResult:
-    
+
     # 1. Importa las dos clases que ya tienes en src/etl/
     #    (las mismas que usa run_bronze_to_silver.py)
     from src.storage.minio_client import MinIOStorageClient
@@ -32,14 +32,14 @@ def silver_events(context: AssetExecutionContext) -> MaterializeResult:
     # 4. Itera y ejecuta etl.run() para cada archivo
     #    Acumula: successful, failed, total_rows (igual que en main())
     successful, skipped, failed, total_rows = 0, 0, 0, 0
-    
+
     for key in bronze_files:
         result = etl.run(key)
         status = result.get("status")
 
         if result.get("status") == "success":
             successful += 1
-            rows = result.get('storage', {}).get('rows', 0)
+            rows = result.get("storage", {}).get("rows", 0)
             total_rows += rows
         elif status == "skipped":
             skipped += 1
@@ -47,23 +47,23 @@ def silver_events(context: AssetExecutionContext) -> MaterializeResult:
         else:
             failed += 1
             context.log.warning(f"Fallo en: {key} → {result}")
-            
 
     # 5. Devuelve MaterializeResult con metadata
     #    Esto es lo que aparece en la Dagster UI
     return MaterializeResult(
         metadata={
             "archivos_procesados": MetadataValue.int(len(bronze_files)),
-            "exitosos":            MetadataValue.int(successful),
-            "omitidos":            MetadataValue.int(skipped),
-            "fallidos":            MetadataValue.int(failed),
-            "total_filas":         MetadataValue.int(total_rows),
+            "exitosos": MetadataValue.int(successful),
+            "omitidos": MetadataValue.int(skipped),
+            "fallidos": MetadataValue.int(failed),
+            "total_filas": MetadataValue.int(total_rows),
         }
     )
 
+
 @asset(
     group_name="medallion",
-    description="Ingesta local → MinIO Bronze: sube JSON de data/bronze/production"
+    description="Ingesta local → MinIO Bronze: sube JSON de data/bronze/production",
 )
 def bronze_raw_events(context: AssetExecutionContext) -> MaterializeResult:
 
@@ -73,9 +73,11 @@ def bronze_raw_events(context: AssetExecutionContext) -> MaterializeResult:
     from src.etl.ingest_bronze_production import collect_files, ensure_bucket
 
     BRONZE_ROOT = Path("data/bronze/production")
-    BUCKET      = "bronze"
-    S3_PREFIX   = "wow_raid_events/v1"
-    INGEST_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")  # ← dentro de la función para que no se congele
+    BUCKET = "bronze"
+    S3_PREFIX = "wow_raid_events/v1"
+    INGEST_DATE = datetime.now(timezone.utc).strftime(
+        "%Y-%m-%d"
+    )  # ← dentro de la función para que no se congele
 
     storage = MinIOStorageClient()
     ensure_bucket(storage, BUCKET)
@@ -105,17 +107,18 @@ def bronze_raw_events(context: AssetExecutionContext) -> MaterializeResult:
 
     return MaterializeResult(
         metadata={
-            "raids_detectados":  MetadataValue.int(len(raids)),
-            "archivos_subidos":  MetadataValue.int(success),
-            "fallidos":          MetadataValue.int(failed),
-            "mb_transferidos":   MetadataValue.float(round(total_bytes / 1024 / 1024, 2)),
+            "raids_detectados": MetadataValue.int(len(raids)),
+            "archivos_subidos": MetadataValue.int(success),
+            "fallidos": MetadataValue.int(failed),
+            "mb_transferidos": MetadataValue.float(round(total_bytes / 1024 / 1024, 2)),
         }
     )
+
 
 @asset(
     group_name="medallion",
     deps=["silver_events"],
-    description="ETL Silver → Gold distribuido: 4 tablas Gold via PySpark S3A"
+    description="ETL Silver → Gold distribuido: 4 tablas Gold via PySpark S3A",
 )
 def gold_tables_spark(context: AssetExecutionContext) -> MaterializeResult:
     import time
@@ -138,19 +141,19 @@ def gold_tables_spark(context: AssetExecutionContext) -> MaterializeResult:
         n_filas = df_silver.count()
         context.log.info(f"Filas Silver cargadas: {n_filas:,}")
 
-        fact_raid    = compute_fact_raid_summary(df_silver)
+        fact_raid = compute_fact_raid_summary(df_silver)
         fact_players = compute_fact_player_raid_stats(df_silver)
-        dim_player   = compute_dim_player(df_silver)
-        dim_raid     = compute_dim_raid(df_silver, fact_raid)
+        dim_player = compute_dim_player(df_silver)
+        dim_raid = compute_dim_raid(df_silver, fact_raid)
 
         # Métricas antes de escribir (count() fuerza la evaluación lazy de Spark)
-        n_raids   = fact_raid.count()
+        n_raids = fact_raid.count()
         n_players = dim_player.count()
 
-        write_gold(fact_raid,    "fact_raid_summary")
+        write_gold(fact_raid, "fact_raid_summary")
         write_gold(fact_players, "fact_player_raid_stats")
-        write_gold(dim_player,   "dim_player", None)
-        write_gold(dim_raid,     "dim_raid",   "raid_id")
+        write_gold(dim_player, "dim_player", None)
+        write_gold(dim_raid, "dim_raid", "raid_id")
 
         elapsed = round(time.perf_counter() - t_start, 2)
         context.log.info(f"Gold completo en {elapsed}s")
@@ -158,19 +161,20 @@ def gold_tables_spark(context: AssetExecutionContext) -> MaterializeResult:
         return MaterializeResult(
             metadata={
                 "filas_silver_procesadas": MetadataValue.int(n_filas),
-                "raids_procesados":        MetadataValue.int(n_raids),
-                "jugadores_unicos":        MetadataValue.int(n_players),
-                "tablas_gold_escritas":    MetadataValue.int(4),
-                "duracion_s":              MetadataValue.float(elapsed),
+                "raids_procesados": MetadataValue.int(n_raids),
+                "jugadores_unicos": MetadataValue.int(n_players),
+                "tablas_gold_escritas": MetadataValue.int(4),
+                "duracion_s": MetadataValue.float(elapsed),
             }
         )
     finally:
-        stop_spark_session(spark)   # ← se ejecuta siempre, incluso si hay excepción
+        stop_spark_session(spark)  # ← se ejecuta siempre, incluso si hay excepción
+
 
 @asset(
     group_name="medallion",
     deps=["silver_events"],
-    description="ETL Silver → Gold Pandas/DuckDB: 4 tablas Gold por partición con validación Pydantic"
+    description="ETL Silver → Gold Pandas/DuckDB: 4 tablas Gold por partición con validación Pydantic",
 )
 def gold_tables_duckdb(context: AssetExecutionContext) -> MaterializeResult:
     from src.analytics.gold_layer import GoldLayerETL
@@ -178,7 +182,7 @@ def gold_tables_duckdb(context: AssetExecutionContext) -> MaterializeResult:
     etl = GoldLayerETL()
     context.log.info("Descubriendo particiones Silver...")
 
-    summary = etl.run_all()   # descubre + procesa todas las particiones
+    summary = etl.run_all()  # descubre + procesa todas las particiones
 
     # Loguear particiones fallidas individualmente si las hay
     for err in summary.get("errors", []):
@@ -190,7 +194,7 @@ def gold_tables_duckdb(context: AssetExecutionContext) -> MaterializeResult:
     return MaterializeResult(
         metadata={
             "particiones_procesadas": MetadataValue.int(summary["total_partitions"]),
-            "exitosas":               MetadataValue.int(summary["successful"]),
-            "fallidas":               MetadataValue.int(summary["failed"]),
+            "exitosas": MetadataValue.int(summary["successful"]),
+            "fallidas": MetadataValue.int(summary["failed"]),
         }
     )

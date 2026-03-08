@@ -85,6 +85,7 @@ def main() -> int:
 
     try:
         from src.analytics.gold_layer import GoldLayerETL
+
         etl = GoldLayerETL()
 
         # ── Modo --all ──────────────────────────────────────────────────
@@ -105,7 +106,9 @@ def main() -> int:
             if summary["errors"]:
                 print("\n  Particiones con error:")
                 for err in summary["errors"]:
-                    print(f"    • {err['raid_id']} / {err['event_date']}: {err['error']}")
+                    print(
+                        f"    • {err['raid_id']} / {err['event_date']}: {err['error']}"
+                    )
 
             print()
             print(json.dumps(summary["results"], indent=2, default=str))

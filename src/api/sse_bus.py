@@ -2,6 +2,7 @@ from collections import deque
 from typing import Any
 import threading
 
+
 class SSEBus:
     """
     BUS para broadcasting de eventos a múltiples clientes SSE.
@@ -29,7 +30,7 @@ class SSEBus:
         with self._lock:
             if q in self._subscribers:
                 self._subscribers.remove(q)
-    
+
     def publish(self, event_dict: dict[str, Any]) -> None:
         """
         Envía un evento (dict JSON-serializable) a todas las colas activas.
@@ -37,6 +38,7 @@ class SSEBus:
         with self._lock:
             for q in self._subscribers:
                 q.append(event_dict)
+
 
 # Instancia global para usar desde receiver.py / app.py
 sse_bus = SSEBus()

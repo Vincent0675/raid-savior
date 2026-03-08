@@ -31,14 +31,15 @@ from src.storage.minio_client import MinIOStorageClient
 # UTILIDADES
 # ============================================================================
 
+
 def format_bytes(size_bytes: int) -> str:
     """Convierte bytes a formato legible (B, KB, MB)."""
     if size_bytes < 1024:
         return f"{size_bytes} B"
-    elif size_bytes < 1024 ** 2:
+    elif size_bytes < 1024**2:
         return f"{size_bytes / 1024:.2f} KB"
     else:
-        return f"{size_bytes / (1024 ** 2):.2f} MB"
+        return f"{size_bytes / (1024**2):.2f} MB"
 
 
 def _separator(title: str = "", width: int = 70) -> None:
@@ -59,6 +60,7 @@ def _object_size(storage: MinIOStorageClient, bucket: str, key: str) -> int:
     response = storage.s3.head_object(Bucket=bucket, Key=key)
     return cast(int, response["ContentLength"])
 
+
 def discover_gold_partitions(
     storage: MinIOStorageClient, bucket: str
 ) -> list[tuple[str, str]]:
@@ -72,7 +74,7 @@ def discover_gold_partitions(
     -------
     Lista de (raid_id, event_date) ordenada alfabéticamente.
     """
-    prefix   = "fact_raid_summary/"
+    prefix = "fact_raid_summary/"
     contents = []
 
     response = storage.s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
@@ -88,20 +90,24 @@ def discover_gold_partitions(
 
     partitions: set[tuple[str, str]] = set()
     for obj in contents:
-        parts    = obj["Key"].split("/")
-        raid_seg = next((s for s in parts if s.startswith("raid_id=")),    None)
+        parts = obj["Key"].split("/")
+        raid_seg = next((s for s in parts if s.startswith("raid_id=")), None)
         date_seg = next((s for s in parts if s.startswith("event_date=")), None)
         if raid_seg and date_seg:
-            partitions.add((
-                raid_seg.split("=", 1)[1],
-                date_seg.split("=", 1)[1],
-            ))
+            partitions.add(
+                (
+                    raid_seg.split("=", 1)[1],
+                    date_seg.split("=", 1)[1],
+                )
+            )
 
     return sorted(partitions)
+
 
 # ============================================================================
 # SECCIONES DE INSPECCION
 # ============================================================================
+
 
 def inspect_dim_player(storage: MinIOStorageClient, bucket: str) -> pd.DataFrame:
     """Inspecciona dim_player: jugadores unicos, roles y clases."""
@@ -111,7 +117,7 @@ def inspect_dim_player(storage: MinIOStorageClient, bucket: str) -> pd.DataFrame
 
     try:
         size = _object_size(storage, bucket, key)
-        df   = _read_parquet(storage, bucket, key)
+        df = _read_parquet(storage, bucket, key)
 
         print(f"  Ruta             : s3://{bucket}/{key}")
         print(f"  Tamano           : {format_bytes(size)}")
@@ -126,14 +132,23 @@ def inspect_dim_player(storage: MinIOStorageClient, bucket: str) -> pd.DataFrame
             print(f"    {cls:>15} : {count} jugador(es)")
 
         print("\n  Muestra (3 filas):")
-        cols = ["player_id", "player_name", "player_class",
-                "player_role", "first_seen_date", "last_seen_date", "total_raids"]
+        cols = [
+            "player_id",
+            "player_name",
+            "player_class",
+            "player_role",
+            "first_seen_date",
+            "last_seen_date",
+            "total_raids",
+        ]
         print(df[cols].head(3).to_string(index=False))
 
         unknown = (df["player_role"] == "unknown").sum()
         if unknown > 0:
-            print(f"\n  [WARN] {unknown} jugador(es) con rol 'unknown' "
-                  f"(campos opcionales sin asignar en Silver)")
+            print(
+                f"\n  [WARN] {unknown} jugador(es) con rol 'unknown' "
+                f"(campos opcionales sin asignar en Silver)"
+            )
 
         return df
 
@@ -152,8 +167,8 @@ def inspect_dim_raid(
 
     try:
         size = _object_size(storage, bucket, key)
-        df   = _read_parquet(storage, bucket, key)
-        row  = df.iloc[0]
+        df = _read_parquet(storage, bucket, key)
+        row = df.iloc[0]
 
         print(f"  Ruta   : s3://{bucket}/{key}")
         print(f"  Tamano : {format_bytes(size)}")
@@ -179,15 +194,17 @@ def inspect_fact_raid_summary(
     storage: MinIOStorageClient, bucket: str, raid_id: str, event_date: str
 ) -> pd.DataFrame:
     """Inspecciona fact_raid_summary: KPIs macro del encuentro."""
-    key = (f"fact_raid_summary/raid_id={raid_id}/"
-           f"event_date={event_date}/fact_raid_summary.parquet")
+    key = (
+        f"fact_raid_summary/raid_id={raid_id}/"
+        f"event_date={event_date}/fact_raid_summary.parquet"
+    )
 
     _separator(f"[ fact_raid_summary ] KPIs Macro ({raid_id})")
 
     try:
         size = _object_size(storage, bucket, key)
-        df   = _read_parquet(storage, bucket, key)
-        row  = df.iloc[0]
+        df = _read_parquet(storage, bucket, key)
+        row = df.iloc[0]
 
         print(f"  Ruta   : s3://{bucket}/{key}")
         print(f"  Tamano : {format_bytes(size)}")
@@ -224,14 +241,16 @@ def inspect_fact_player_stats(
     storage: MinIOStorageClient, bucket: str, raid_id: str, event_date: str
 ) -> pd.DataFrame:
     """Inspecciona fact_player_raid_stats: KPIs por jugador con insights de negocio."""
-    key = (f"fact_player_raid_stats/raid_id={raid_id}/"
-           f"event_date={event_date}/fact_player_raid_stats.parquet")
+    key = (
+        f"fact_player_raid_stats/raid_id={raid_id}/"
+        f"event_date={event_date}/fact_player_raid_stats.parquet"
+    )
 
     _separator(f"[ fact_player_raid_stats ] KPIs por Jugador ({raid_id})")
 
     try:
         size = _object_size(storage, bucket, key)
-        df   = _read_parquet(storage, bucket, key)
+        df = _read_parquet(storage, bucket, key)
 
         print(f"  Ruta   : s3://{bucket}/{key}")
         print(f"  Tamano : {format_bytes(size)}")
@@ -243,8 +262,10 @@ def inspect_fact_player_stats(
         ]
         print("\n  Top 3 por DPS:")
         for _, p in top_dps.iterrows():
-            print(f"    {p['player_name']:>12} ({p['player_class']:>12}, {p['player_role']:>7})"
-                  f" -> DPS: {p['dps']:>8,.1f} | share: {p['damage_share'] * 100:.1f}%")
+            print(
+                f"    {p['player_name']:>12} ({p['player_class']:>12}, {p['player_role']:>7})"
+                f" -> DPS: {p['dps']:>8,.1f} | share: {p['damage_share'] * 100:.1f}%"
+            )
 
         # Top 3 HPS (solo quienes curaron)
         healers = df[df["hps"] > 0]
@@ -254,16 +275,20 @@ def inspect_fact_player_stats(
             ]
             print("\n  Top 3 por HPS:")
             for _, p in top_hps.iterrows():
-                print(f"    {p['player_name']:>12} ({p['player_class']:>12}, {p['player_role']:>7})"
-                      f" -> HPS: {p['hps']:>8,.1f} | share: {p['healing_share'] * 100:.1f}%")
+                print(
+                    f"    {p['player_name']:>12} ({p['player_class']:>12}, {p['player_role']:>7})"
+                    f" -> HPS: {p['hps']:>8,.1f} | share: {p['healing_share'] * 100:.1f}%"
+                )
 
         # Jugadores con mas muertes
         with_deaths = df[df["player_deaths"] > 0]
         if not with_deaths.empty:
             print("\n  Jugadores con mas muertes:")
             for _, p in with_deaths.nlargest(3, "player_deaths").iterrows():
-                print(f"    {p['player_name']:>12} ({p['player_role']:>7})"
-                      f" -> {int(p['player_deaths'])} muerte(s)")
+                print(
+                    f"    {p['player_name']:>12} ({p['player_role']:>7})"
+                    f" -> {int(p['player_deaths'])} muerte(s)"
+                )
         else:
             print("\n  Sin muertes registradas en esta raid.")
 
@@ -280,6 +305,7 @@ def inspect_fact_player_stats(
     except Exception as exc:
         print(f"  [ERROR] No se pudo leer fact_player_raid_stats: {exc}")
         return pd.DataFrame()
+
 
 def inspect_partition_compact(
     storage: MinIOStorageClient,
@@ -312,8 +338,8 @@ def inspect_partition_compact(
         )
         key_dim_raid = f"dim_raid/raid_id={raid_id}/dim_raid.parquet"
 
-        df_summary  = _read_parquet(storage, bucket, key_summary)
-        df_players  = _read_parquet(storage, bucket, key_players)
+        df_summary = _read_parquet(storage, bucket, key_summary)
+        df_players = _read_parquet(storage, bucket, key_players)
         df_dim_raid = _read_parquet(storage, bucket, key_dim_raid)
 
         row_s = df_summary.iloc[0]
@@ -323,25 +349,26 @@ def inspect_partition_compact(
         raid_size_ok = int(row_s["n_players"]) <= int(row_r["raid_size"])
         damage_share_ok = abs(df_players["damage_share"].sum() - 1.0) < 0.01
 
-
-        result.update({
-            "boss_name": row_r["boss_name"],
-            "difficulty": row_r["difficulty"],
-            "raid_size": int(row_r["raid_size"]),
-            "duration_target_ms": int(row_r["duration_target_ms"]),
-            "outcome": row_s["raid_outcome"],
-            "total_damage": row_s["total_damage"],
-            "total_healing": row_s["total_healing"],
-            "raid_dps": row_s["raid_dps"],
-            "raid_hps": row_s["raid_hps"],
-            "deaths": int(row_s["total_player_deaths"]),
-            "n_players": int(row_s["n_players"]),
-            "boss_min_hp": row_s["boss_min_hp_pct"],
-            "fk_raid_ok": fk_raid_ok,
-            "raid_size_ok": raid_size_ok,
-            "damage_share_ok": damage_share_ok,
-            "coherence_ok": all([fk_raid_ok, raid_size_ok, damage_share_ok]),
-        })
+        result.update(
+            {
+                "boss_name": row_r["boss_name"],
+                "difficulty": row_r["difficulty"],
+                "raid_size": int(row_r["raid_size"]),
+                "duration_target_ms": int(row_r["duration_target_ms"]),
+                "outcome": row_s["raid_outcome"],
+                "total_damage": row_s["total_damage"],
+                "total_healing": row_s["total_healing"],
+                "raid_dps": row_s["raid_dps"],
+                "raid_hps": row_s["raid_hps"],
+                "deaths": int(row_s["total_player_deaths"]),
+                "n_players": int(row_s["n_players"]),
+                "boss_min_hp": row_s["boss_min_hp_pct"],
+                "fk_raid_ok": fk_raid_ok,
+                "raid_size_ok": raid_size_ok,
+                "damage_share_ok": damage_share_ok,
+                "coherence_ok": all([fk_raid_ok, raid_size_ok, damage_share_ok]),
+            }
+        )
 
     except Exception as exc:
         result["error"] = str(exc)
@@ -352,6 +379,7 @@ def inspect_partition_compact(
 # ============================================================================
 # VERIFICACIONES DE COHERENCIA
 # ============================================================================
+
 
 def check_coherence(
     df_dim_player: pd.DataFrame,
@@ -392,17 +420,19 @@ def check_coherence(
 
     # 1. FK: player_ids en facts ⊆ dim_player
     if not df_dim_player.empty and not df_fact_players.empty:
-        dim_ids  = set(df_dim_player["player_id"])
+        dim_ids = set(df_dim_player["player_id"])
         fact_ids = set(df_fact_players["player_id"])
-        orphans  = fact_ids - dim_ids
+        orphans = fact_ids - dim_ids
         if orphans:
-            fail(f"FK dim_player: {len(orphans)} player_id(s) sin entrada en dim_player -> {orphans}")
+            fail(
+                f"FK dim_player: {len(orphans)} player_id(s) sin entrada en dim_player -> {orphans}"
+            )
         else:
             ok("FK dim_player: todos los player_ids de facts existen en dim_player")
 
     # 2. FK: raid_id consistente
     if not df_dim_raid.empty and not df_fact_summary.empty:
-        dim_rid  = df_dim_raid["raid_id"].iloc[0]
+        dim_rid = df_dim_raid["raid_id"].iloc[0]
         fact_rid = df_fact_summary["raid_id"].iloc[0]
         if dim_rid == fact_rid:
             ok(f"FK dim_raid: raid_id '{fact_rid}' consistente entre todas las tablas")
@@ -423,7 +453,9 @@ def check_coherence(
     if not df_fact_players.empty:
         total_hs = df_fact_players["healing_share"].sum()
         if total_hs == 0.0:
-            warn("healing_share total = 0.0 (sin eventos de curacion en esta particion)")
+            warn(
+                "healing_share total = 0.0 (sin eventos de curacion en esta particion)"
+            )
         elif abs(total_hs - 1.0) < 0.01:
             ok(f"healing_share total ≈ 1.0 (actual: {total_hs:.6f})")
         else:
@@ -431,13 +463,17 @@ def check_coherence(
 
     # 5. Composicion de roles <= n_players
     if not df_fact_summary.empty:
-        row         = df_fact_summary.iloc[0]
+        row = df_fact_summary.iloc[0]
         total_roles = int(row["n_tanks"]) + int(row["n_healers"]) + int(row["n_dps"])
-        n_players   = int(row["n_players"])
+        n_players = int(row["n_players"])
         if total_roles <= n_players:
-            ok(f"Composicion: tanks+healers+dps ({total_roles}) <= n_players ({n_players})")
+            ok(
+                f"Composicion: tanks+healers+dps ({total_roles}) <= n_players ({n_players})"
+            )
         else:
-            fail(f"Composicion: tanks+healers+dps ({total_roles}) > n_players ({n_players})")
+            fail(
+                f"Composicion: tanks+healers+dps ({total_roles}) > n_players ({n_players})"
+            )
 
     # 6. crit_rate en [0, 1]
     if not df_fact_players.empty:
@@ -474,9 +510,8 @@ def check_coherence(
     else:
         print("  Revisa los fallos antes de usar Gold en dashboards o modelos.")
 
-def inspect_all(
-    storage: MinIOStorageClient, bucket: str
-) -> None:
+
+def inspect_all(storage: MinIOStorageClient, bucket: str) -> None:
     """
     Inspecciona TODAS las particiones Gold con vista consolidada.
 
@@ -518,9 +553,9 @@ def inspect_all(
         f"{'deaths':>7} {'players':>11} {'boss_hp%':>9}"
     )
     print(
-        f" {'─'*10} {'─'*13} {'─'*16} {'─'*10} "
-        f"{'─'*10} {'─'*13} {'─'*9} {'─'*9} "
-        f"{'─'*7} {'─'*11} {'─'*9}"
+        f" {'─' * 10} {'─' * 13} {'─' * 16} {'─' * 10} "
+        f"{'─' * 10} {'─' * 13} {'─' * 9} {'─' * 9} "
+        f"{'─' * 7} {'─' * 11} {'─' * 9}"
     )
 
     total_damage = 0.0
@@ -562,17 +597,21 @@ def inspect_all(
         )
 
     # ── 3. Totales globales ────────────────────────────────────────────────
-    print(f"\n  {'TOTAL':<10} {'':13} {'':9} "
-          f"  {total_damage:>12,.0f} {'':>9} {'':>9} "
-          f"{total_deaths:>7} {'':>8}")
+    print(
+        f"\n  {'TOTAL':<10} {'':13} {'':9} "
+        f"  {total_damage:>12,.0f} {'':>9} {'':>9} "
+        f"{total_deaths:>7} {'':>8}"
+    )
 
     # ── 4. Top 5 DPS acumulado entre todas las particiones ────────────────
     _separator("[ Top Performers ] DPS / HPS Acumulado (todas las raids)")
     all_players: list[pd.DataFrame] = []
 
     for raid_id, event_date in partitions:
-        key = (f"fact_player_raid_stats/raid_id={raid_id}/"
-               f"event_date={event_date}/fact_player_raid_stats.parquet")
+        key = (
+            f"fact_player_raid_stats/raid_id={raid_id}/"
+            f"event_date={event_date}/fact_player_raid_stats.parquet"
+        )
         try:
             df = _read_parquet(storage, bucket, key)
             all_players.append(df)
@@ -585,24 +624,30 @@ def inspect_all(
         # Agrupa por jugador y suma DPS × raids (media ponderada real)
         agg = (
             df_all.groupby(["player_id", "player_name", "player_class", "player_role"])
-            .agg(avg_dps=("dps", "mean"), avg_hps=("hps", "mean"), raids=("dps", "count"))
+            .agg(
+                avg_dps=("dps", "mean"), avg_hps=("hps", "mean"), raids=("dps", "count")
+            )
             .reset_index()
             .sort_values("avg_dps", ascending=False)
         )
 
         print("\n  Top 5 DPS promedio:")
         for _, p in agg.head(5).iterrows():
-            print(f"    {p['player_name']:>12} ({p['player_class']:>12}, "
-                  f"{p['player_role']:>7}) → {p['avg_dps']:>9,.1f} DPS "
-                  f"[{int(p['raids'])} raid(s)]")
+            print(
+                f"    {p['player_name']:>12} ({p['player_class']:>12}, "
+                f"{p['player_role']:>7}) → {p['avg_dps']:>9,.1f} DPS "
+                f"[{int(p['raids'])} raid(s)]"
+            )
 
         healers = agg[agg["avg_hps"] > 0]
         if not healers.empty:
             print("\n  Top 5 HPS promedio:")
             for _, p in healers.head(5).iterrows():
-                print(f"    {p['player_name']:>12} ({p['player_class']:>12}, "
-                      f"{p['player_role']:>7}) → {p['avg_hps']:>9,.1f} HPS "
-                      f"[{int(p['raids'])} raid(s)]")
+                print(
+                    f"    {p['player_name']:>12} ({p['player_class']:>12}, "
+                    f"{p['player_role']:>7}) → {p['avg_hps']:>9,.1f} HPS "
+                    f"[{int(p['raids'])} raid(s)]"
+                )
 
     # ── 5. Resumen final ───────────────────────────────────────────────────
     _separator("[ Resumen Batch ]")
@@ -626,9 +671,11 @@ def inspect_all(
     else:
         print("\n  ⚠️  Revisa los errores antes de continuar.")
 
+
 # ============================================================================
 # CLI
 # ============================================================================
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -662,10 +709,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    args    = parse_args()
-    config  = Config()
+    args = parse_args()
+    config = Config()
     storage = MinIOStorageClient()
-    bucket  = config.S3_BUCKET_GOLD
+    bucket = config.S3_BUCKET_GOLD
 
     # ── Modo --all ─────────────────────────────────────────────────────────
     if args.all:
@@ -686,9 +733,9 @@ def main() -> None:
     print(f"  Bucket: s3://{bucket}/")
 
     df_dim_player = inspect_dim_player(storage, bucket)
-    df_dim_raid   = inspect_dim_raid(storage, bucket, raid_id)
-    df_summary    = inspect_fact_raid_summary(storage, bucket, raid_id, event_date)
-    df_players    = inspect_fact_player_stats(storage, bucket, raid_id, event_date)
+    df_dim_raid = inspect_dim_raid(storage, bucket, raid_id)
+    df_summary = inspect_fact_raid_summary(storage, bucket, raid_id, event_date)
+    df_players = inspect_fact_player_stats(storage, bucket, raid_id, event_date)
 
     check_coherence(df_dim_player, df_dim_raid, df_summary, df_players)
 
