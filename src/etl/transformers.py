@@ -76,7 +76,7 @@ class SilverTransformer:
         # independientemente de si el generador produjo strings o ints
         if "data_quality_flags" in df.columns:
 
-            def normalize_flags(val):
+            def normalize_flags(val: object) -> list[str]:
                 if isinstance(val, list):
                     return [str(f) for f in val if f is not None]
                 if val is None or (isinstance(val, float) and pd.isna(val)):
