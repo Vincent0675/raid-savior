@@ -9,31 +9,73 @@ Soporta dos formatos de entrada:
 v2.1: Resolución de timestamps en microsegundos para compatibilidad nativa con Spark/Delta (Fase 7)
 """
 
-import os
-import pandas as pd
-import re
-import json
-from typing import Any
+import hashlib  # ← movido al top-level (ruff: E402)
 import io
+import json
+import os
+import re
+from typing import Any
 
-from src.storage.minio_client import MinIOStorageClient
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+
 from src.etl.transformers import SilverTransformer
+from src.storage.minio_client import MinIOStorageClient
+
+
+SILVER_SCHEMA = pa.schema(
+    [
+        pa.field("event_id", pa.string()),
+        pa.field("event_type", pa.string()),
+        pa.field("timestamp", pa.timestamp("us", tz="UTC")),
+        pa.field("encounter_id", pa.string()),
+        pa.field("encounter_duration_ms", pa.int64()),
+        pa.field("source_player_id", pa.string()),
+        pa.field("source_player_name", pa.string()),
+        pa.field("source_player_role", pa.string()),
+        pa.field("source_player_class", pa.string()),
+        pa.field("source_player_level", pa.int64()),
+        pa.field("ability_id", pa.string()),
+        pa.field("ability_name", pa.string()),
+        pa.field("ability_school", pa.string()),
+        pa.field("damage_amount", pa.float64()),
+        pa.field("healing_amount", pa.float64()),
+        pa.field("is_critical_hit", pa.bool_()),
+        pa.field("critical_multiplier", pa.float64()),
+        pa.field("is_resisted", pa.bool_()),
+        pa.field("is_blocked", pa.bool_()),
+        pa.field("is_absorbed", pa.bool_()),
+        pa.field("target_entity_id", pa.string()),
+        pa.field("target_entity_name", pa.string()),
+        pa.field("target_entity_type", pa.string()),
+        pa.field("target_entity_health_pct_before", pa.float64()),
+        pa.field("target_entity_health_pct_after", pa.float64()),
+        pa.field("resource_type", pa.string()),
+        pa.field("resource_amount_before", pa.float64()),
+        pa.field("resource_amount_after", pa.float64()),
+        pa.field("resource_regeneration_rate", pa.float64()),
+        pa.field("ingestion_timestamp", pa.string()),
+        pa.field("source_system", pa.string()),
+        pa.field("data_quality_flags", pa.list_(pa.large_utf8())),
+        pa.field("server_latency_ms", pa.int64()),
+        pa.field("client_latency_ms", pa.int64()),
+        pa.field("is_massive_hit", pa.bool_()),
+    ]
+)  # Nota: event_date y raid_id se excluyen — se usan como partición y se dropean antes de escribir
 
 
 class BronzeToSilverETL:
-    def __init__(self):
-        # Cliente MinIO ya existente de la Fase 2
+    def __init__(self) -> None:
         self.storage = MinIOStorageClient()
-        # Leemos buckets del .env (con valores por defecto por seguridad)
         self.bucket_bronze = os.getenv("S3_BUCKET_BRONZE", "bronze")
         self.bucket_silver = os.getenv("S3_BUCKET_SILVER", "silver")
         self.transformer = SilverTransformer()
 
     def read_bronze_batch(self, batch_key: str) -> dict[str, Any] | list[Any]:
-        """Descarga y deserializa el JSON de Bronze"""
+        """Descarga y deserializa el JSON de Bronze."""
         try:
             response = self.storage.get_object(self.bucket_bronze, batch_key)
-            # MinIO devuelve un stream, lo leemos y decodificamos
             content = response.read().decode("utf-8")
             data = json.loads(content)
             if not isinstance(data, dict | list):
@@ -42,7 +84,9 @@ class BronzeToSilverETL:
         except Exception as err:
             raise OSError(f"Error leyendo Bronze [{batch_key}]: {err}") from err
 
-    def save_silver(self, df: pd.DataFrame, raid_id: str, batch_id: str) -> dict:
+    def save_silver(
+        self, df: pd.DataFrame, raid_id: str, batch_id: str
+    ) -> dict[str, Any]:  # ← anotación completa (mypy)
         """
         Guarda el DataFrame como Parquet comprimido con Snappy.
         Ruta: raid_id=X / event_date=Y / part-Z.parquet
@@ -50,46 +94,47 @@ class BronzeToSilverETL:
         if df.empty:
             return {"status": "skipped", "reason": "empty_dataframe"}
 
-        # Obtenemos la fecha para la partición Hive-style
         event_date = (
             df["event_date"].iloc[0] if "event_date" in df.columns else "unknown"
         )
 
-        # Construimos la ruta destino (Key)
-        s3_key = f"wow_raid_events/v1/raid_id={raid_id}/event_date={event_date}/part-{batch_id}.parquet"
+        s3_key = (
+            f"wow_raid_events/v1/raid_id={raid_id}"
+            f"/event_date={event_date}/part-{batch_id}.parquet"
+        )
 
-        # --- CORRECCIÓN: Prevenir conflicto de particiones ---
-        # Hacemos una copia para no afectar al DataFrame original en memoria
-        df_to_save = df.copy()
+        df_to_save = df.drop(
+            columns=[c for c in ("raid_id", "event_date") if c in df.columns]
+        )
 
-        # Eliminamos las columnas que YA están en la ruta de carpetas (partition keys)
-        # para que PyArrow no se confunda al leer.
-        cols_to_drop = []
-        if "raid_id" in df_to_save.columns:
-            cols_to_drop.append("raid_id")
-        if "event_date" in df_to_save.columns:
-            cols_to_drop.append("event_date")
-
-        if cols_to_drop:
-            df_to_save = df_to_save.drop(columns=cols_to_drop)
+        df_to_save = df.drop(
+            columns=[c for c in ("raid_id", "event_date") if c in df.columns]
+        )
 
         try:
-            # 1. Serializar a Buffer en memoria (usando df_to_save)
-            out_buffer = io.BytesIO()
+            # ── SCHEMA-ON-WRITE EXPLÍCITO ─────────────────────────────────────
+            # Conversión de timezone a UTC (Spark requiere UTC internamente)
+            if "timestamp" in df_to_save.columns:
+                df_to_save["timestamp"] = df_to_save["timestamp"].dt.tz_convert("UTC")
 
-            # ---> FIX PARA SPARK (FASE 7) <---
-            # Forzamos los timestamps de datetime64[ns] (Pandas) a TIMESTAMP(unit=MICROS)
-            # para que Spark los interprete nativamente como TimestampType y no como LongType.
-            df_to_save.to_parquet(
-                out_buffer,
-                index=False,
-                engine="pyarrow",
-                compression="snappy",
-                coerce_timestamps="us",  # Baja la resolución a microsegundos
-                allow_truncated_timestamps=True,  # Permite el truncamiento sin lanzar excepción
+            # Conversión a Arrow con schema forzado — elimina inferencia de tipos
+            arrow_table = pa.Table.from_pandas(
+                df_to_save,
+                schema=SILVER_SCHEMA,
+                preserve_index=False,
+                safe=False,  # coerción automática: int→float, etc.
             )
 
-            # 2. Subir a MinIO
+            # Serialización con timestamps en microsegundos (Spark compat)
+            out_buffer = io.BytesIO()
+            pq.write_table(
+                arrow_table,
+                out_buffer,
+                compression="snappy",
+                coerce_timestamps="us",
+                allow_truncated_timestamps=True,
+            )
+
             out_buffer.seek(0)
             data_len = out_buffer.getbuffer().nbytes
 
@@ -111,57 +156,46 @@ class BronzeToSilverETL:
         except Exception as err:
             raise OSError(f"Error escribiendo Silver: {err}") from err
 
-    def run(self, bronze_key: str) -> dict:
+    def run(self, bronze_key: str) -> dict[str, Any]:  # ← anotación completa (mypy)
         """
         Ejecuta el ciclo completo para un archivo específico.
-        Soporta dos formatos de JSON:
-        1. Envelope (HTTP): {"batch_id": "...", "events": [...]}
-        2. Array directo (S3): [...]
         """
         print(f"⚡ [ETL] Procesando: {bronze_key}")
 
         # 1. READ
         raw_data = self.read_bronze_batch(bronze_key)
 
-        # ── EXTRACCIÓN DE BATCH_ID (SIEMPRE DESDE EL FILENAME) ────────────
-        # El filename es la fuente de verdad: es determinista, único por
-        # archivo y no depende del contenido del payload.
-        # Regex sin restricción de charset → funciona con 0001, UUIDs, etc.
+        # 2. EXTRAER BATCH_ID (filename como fuente de verdad)
         filename_match = re.search(r"batch_([^/]+?)\.json$", bronze_key)
-        batch_id = filename_match.group(1) if filename_match else None
-
-        if batch_id is None:
-            # Fallback de emergencia: nunca debería llegar aquí
-            import hashlib
-
+        if filename_match:
+            batch_id = filename_match.group(1)
+        else:
             batch_id = hashlib.md5(bronze_key.encode()).hexdigest()[:8]
             print(f"  [WARN] batch_id derivado de hash para: {bronze_key}")
 
-        # 2. NORMALIZAR FORMATO
-        # Detectar si es envelope (dict) o array directo (list)
+        # 3. NORMALIZAR FORMATO
         if isinstance(raw_data, dict):
             events_list = raw_data.get("events", [])
             if not events_list:
                 return {"status": "skipped", "reason": "no_events_in_envelope"}
-
         elif isinstance(raw_data, list):
             events_list = raw_data
             if not events_list:
                 return {"status": "skipped", "reason": "empty_array"}
-
         else:
             return {"status": "error", "reason": f"unknown_json_type: {type(raw_data)}"}  # type: ignore[unreachable]
 
-        # 3. TRANSFORM
+        # 4. TRANSFORM
         df_raw = pd.DataFrame(events_list)
         df_silver, metadata = self.transformer.transform_pipeline(df_raw)
 
-        # 4. WRITE
-        raid_id = (
+        # 5. WRITE
+        raid_id = str(
             df_silver["raid_id"].iloc[0]
             if "raid_id" in df_silver.columns
             else "unknown"
-        )
+        )  # ← str() explícito: iloc[0] con StringDtype devuelve pd.NA-capable
+
         storage_result = self.save_silver(df_silver, raid_id, batch_id)
 
         return {
