@@ -87,3 +87,9 @@ dagster_home
 .ruff_cache
 .mypy_cache
 .coverage
+
+# Exploración y debugging efímero
+notebooks/exploration/
+
+# Checkpoints de Jupyter
+**/.ipynb_checkpoints/
