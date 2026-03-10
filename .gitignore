@@ -90,6 +90,7 @@ dagster_home
 
 # Exploración y debugging efímero
 notebooks/exploration/
+scripts/debug/
 
 # Checkpoints de Jupyter
 **/.ipynb_checkpoints/
