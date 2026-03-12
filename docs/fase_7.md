@@ -53,4 +53,4 @@ La Fase 7 convertirá Silver y Gold en capas más robustas, trazables y preparad
 ## Estado
 
 **Estado de fase:** actual  
-**Subfase activa:** 7.5 Time travel y correciones de negocio (en proceso)
+**Subfase activa:** 7.4 Gold ACID: dimensiones (en proceso)
