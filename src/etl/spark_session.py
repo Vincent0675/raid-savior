@@ -8,6 +8,8 @@ load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env", override=Tru
 
 # Fallback: construye las rutas por defecto si no hay variable de entorno
 
+os.environ.setdefault("PYSPARK_SUBMIT_ARGS", "--driver-memory 3g pyspark-shell")
+
 _jar_default = (
     str(Path.home() / "spark-jars" / "hadoop-aws-3.3.4.jar")
     + ","
@@ -26,17 +28,17 @@ def get_spark_session(app_name: str = "WoWRaidTelemetry") -> SparkSession:
     Usa AWS SDK v1 (hadoop-aws 3.3.4 + aws-java-sdk-bundle-1.12.262).
     """
     return (
-        SparkSession.builder.master("local[*]")  # usa todos los cores del TUF
+        SparkSession.builder.master(
+            "local[*]"
+        )  # usa todos los cores disponibles del TUF
         .appName(app_name)
-        .config("spark.jars", SPARK_JARS)  # los JARs que descargaste
-        # ── Iceberg: carga en classloader del driver ──────────────────
+        .config("spark.jars", SPARK_JARS)
         .config(
             "spark.driver.extraClassPath",
             str(
                 Path.home() / "spark-jars" / "iceberg-spark-runtime-3.5_2.12-1.7.1.jar"
             ),
         )
-        # ── Iceberg catalog ───────────────────────────────────────────
         .config(
             "spark.sql.extensions",
             "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
@@ -44,23 +46,29 @@ def get_spark_session(app_name: str = "WoWRaidTelemetry") -> SparkSession:
         .config("spark.sql.catalog.wow", "org.apache.iceberg.spark.SparkCatalog")
         .config("spark.sql.catalog.wow.type", "hadoop")
         .config("spark.sql.catalog.wow.warehouse", "s3a://warehouse/")
-        # Memoria del driver — conservador para laptop
-        .config("spark.driver.memory", "2g")
-        # ── Conector S3A → MinIO ──────────────────────────────────────
-        # Dónde está MinIO (leído de Config, igual que en tu config.py)
+        .config("spark.sql.shuffle.partitions", "8")
+        .config(
+            "spark.driver.extraJavaOptions", "-XX:+UseSerialGC -XX:-TieredCompilation"
+        )
+        .config(
+            "spark.executor.extraJavaOptions", "-XX:+UseSerialGC -XX:-TieredCompilation"
+        )
+        # ── Entorno de desarrollo (laptop 4GB) ────────────────────────────────────────
+        # Deshabilita el lector vectorizado Arrow de Iceberg.
+        # Arrow requiere memoria off-heap que no está configurada en local.
+        # En producción: revertir a True y configurar spark.memory.offHeap.size.
+        .config("spark.sql.iceberg.vectorization.enabled", "false")
+        # Configuración de producción — NO para el TUF
+        # .config("spark.memory.offHeap.enabled", "true")
+        # .config("spark.memory.offHeap.size", "1g")  # ajustar según nodo
         .config("spark.hadoop.fs.s3a.endpoint", Config.S3_ENDPOINT_URL)
-        # MinIO usa path-style: localhost:9000/bucket (no bucket.localhost)
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        # Credenciales estáticas (las mismas de tu .env)
         .config("spark.hadoop.fs.s3a.access.key", Config.S3_ACCESS_KEY)
         .config("spark.hadoop.fs.s3a.secret.key", Config.S3_SECRET_KEY)
-        # Con SDK v2, forzar proveedor de claves estáticas
-        # Sin esto, SDK v2 busca IAM roles de AWS real → falla en local
         .config(
             "spark.hadoop.fs.s3a.aws.credentials.provider",
             "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
         )
-        # Lee TIMESTAMP(NANOS) como Long en lugar de fallar
         .config("spark.sql.legacy.parquet.nanosAsLong", "true")
         .getOrCreate()
     )
