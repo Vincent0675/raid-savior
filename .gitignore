@@ -89,8 +89,8 @@ dagster_home
 .coverage
 
 # Exploración y debugging efímero
-notebooks/exploration/
-scripts/debug/
+notebooks/exploration
+scripts/debug
 
 # Checkpoints de Jupyter
 **/.ipynb_checkpoints/
