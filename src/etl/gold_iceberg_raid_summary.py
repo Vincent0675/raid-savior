@@ -17,7 +17,7 @@ from src.etl.spark_session import get_spark_session, stop_spark_session
 # ── Schema explícito ──────────────────────────────────────────────────────────
 # Declaramos el schema en lugar de inferirlo: más rápido (evita scan previo)
 # y garantiza Schema-on-Write correcto en Iceberg desde el primer snapshot.
-GOLD_SCHEMA = StructType(
+GOLD_SCHEMA_RAID_SUMMARY = StructType(
     [
         StructField("raid_id", StringType(), True),
         StructField("total_events", LongType(), True),
@@ -31,7 +31,7 @@ GOLD_SCHEMA = StructType(
     ]
 )
 
-GOLD_PARQUET_PATH = "s3a://gold/spark/fact_raid_summary/"
+GOLD_PARQUET_RAID_SUMMARY = "s3a://gold/spark/fact_raid_summary/"
 ICEBERG_TABLE = "wow.gold.fact_raid_summary"
 
 
@@ -39,14 +39,14 @@ def main() -> None:
     spark: SparkSession = get_spark_session("Gold_Iceberg_RaidSummary")
     try:
         # ── 1. LEER toda la capa Silver con schema explícito ──────────────────────
-        print(f">>> Leyendo Parquets desde {GOLD_PARQUET_PATH}")
+        print(f">>> Leyendo Parquets desde {GOLD_PARQUET_RAID_SUMMARY}")
         df_raw = (
-            spark.read.schema(GOLD_SCHEMA)
+            spark.read.schema(GOLD_SCHEMA_RAID_SUMMARY)
             # mergeSchema=false: todos los ficheros deben cumplir el mismo schema.
             # Falla rápido si hay algún fichero con schema distinto (detección temprana).
             .option("mergeSchema", "false")
-            .option("basePath", GOLD_PARQUET_PATH)
-            .parquet(GOLD_PARQUET_PATH)
+            .option("basePath", GOLD_PARQUET_RAID_SUMMARY)
+            .parquet(GOLD_PARQUET_RAID_SUMMARY)
         )
 
         total_rows = df_raw.count()
