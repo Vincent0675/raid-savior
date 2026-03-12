@@ -4,8 +4,8 @@
 **Autor:** Byron V. Blatch Rodriguez   
 **Profesor:** Francisco Javier Ortega   
 **Repositorio:** [github.com/Vincent0675/raid-savior](https://github.com/Vincent0675/raid-savior)   
-**Estado:** Fase 7, implementación ACID mediante Apache Iceberg (en progreso)   
-**Última actualización:** 5 de marzo de 2026.   
+**Estado:** Fase 7, implementación ACID mediante Apache Iceberg (completada)   
+**Última actualización:** 12 de marzo de 2026.   
 
 ***
 
@@ -22,19 +22,19 @@ y formato columnar Parquet en Silver/Gold.
 ### Volumen de datos procesados
 
 | Capa | Bucket MinIO | Raids | Eventos | Formato |
-|------|-------------|-------|---------|---------|
-| Bronze | `bronze` | 10 | ~500.000 | JSON (Hive-style) |
-| Silver | `silver` | 10 | 500.019 | Parquet + Snappy |
-| Gold | `gold` | 10 | — | Parquet + Snappy |
+|------|-------------|-------|---------|---------| 
+| Bronze | `bronze` | 12 | ~600.000 | JSON (Hive-style) |
+| Silver | `silver` | 12 | ~600.000 | Iceberg + Parquet + Snappy |
+| Gold | `gold` | 12 | — | Iceberg + Parquet + Snappy |
 
 ### Tablas Gold generadas (modelo semidimensional)
 
-| Tabla | Filas | Columnas | Partición | Descripción |
-|-------|-------|----------|-----------|-------------|
-| `fact_raid_summary` | 10 | 9 | `raid_id` | KPIs macro por raid |
-| `fact_player_raid_stats` | 200 | 11 | `raid_id` | KPIs por jugador/raid |
-| `dim_player` | 200 | 7 | — | Dimensión jugadores únicos |
-| `dim_raid` | 10 | 6 | `raid_id` | Dimensión raids |
+| Tabla | Filas | Clave natural | Partición | Tipo | Descripción |
+|-------|-------|---------------|-----------|------|-------------|
+| `fact_raid_summary` | 12 | `raid_id` | `event_date` | Hecho | KPIs macro por raid |
+| `fact_player_raid_stats` | ~3.744 | `(player_id, raid_id)` | `event_date` | Hecho | KPIs por jugador/raid |
+| `dim_player` | 312 | `player_id` | `player_class` | Dimensión | Jugadores únicos, upsert ACID |
+| `dim_raid` | 12 | `raid_id` | `event_date` | Dimensión | Raids únicos, upsert ACID |
 
 ### Stack tecnológico por fase
 
@@ -46,7 +46,7 @@ y formato columnar Parquet en Silver/Gold.
 | 4 — ETL Silver→Gold (Pandas) | DuckDB · Pydantic v2 | ✅ Completada |
 | 5 — ETL Silver→Gold (Spark) | PySpark 3.5 · S3A · MinIO | ✅ Completada |
 | 6 — Orquestación | Dagster | ✅ Completada |
-| 7 — Integración ACID | Apache Iceberg | 🔄 En progreso |
+| 7 — Migración Silver/Gold a tablas ACID, MERGE INTO | Apache Iceberg | ✅ Completada |
 
 ### Rendimiento Spark (entorno local)
 
@@ -57,7 +57,6 @@ y formato columnar Parquet en Silver/Gold.
 | Tiempo lectura Silver | ~6 s |
 | Tiempo escritura Gold (4 tablas) | 22.4 s |
 | Hardware | ASUS TUF A15 · RTX 3050 · Pop!\_OS |
-
 | Coherencia Gold | ✅ 0 fallos |
 
 
@@ -196,6 +195,33 @@ Este enfoque es “semi” dimensional porque:
 - **Lecturas analíticas eficientes**: las facts están particionadas por `raid_id` y `event_date`, y las dimensiones son pequeñas, lo que permite joins baratos incluso en un entorno de laptop.   
 - **Preparación natural para BI y ML**: cualquier herramienta de BI o framework de ML puede consumir Gold casi “plug-and-play”, sin necesitar una capa intermedia de modelado adicional.   
 - **Evolución controlada**: se pueden añadir nuevas métricas o atributos dimensionales siguiendo schema evolution de Parquet sin romper la compatibilidad con código existente.   
+
+### 3.4 Subfase 7.4 — Dimensiones Gold (Apache Iceberg + MERGE INTO)
+
+Las dos dimensiones del modelo semidimensional han sido migradas a tablas
+**Apache Iceberg** con escritura **ACID** mediante `MERGE INTO` (upsert).
+
+| Script | Tabla Iceberg | Grain | Columna inmutable | Partición |
+|--------|--------------|-------|-------------------|-----------|
+| `src/etl/gold_iceberg_dim_player.py` | `wow.gold.dim_player` | 1 fila / jugador | `first_seen_date` | `player_class` |
+| `src/etl/gold_iceberg_dim_raid.py` | `wow.gold.dim_raid` | 1 fila / raid | `event_date` | `event_date` |
+
+**Verificación de integridad (ejecución 12/03/2026):**
+
+```
+dim_player — Jugadores únicos : 312 | Diferencia Silver↔Gold : 0 | Snapshot : append
+dim_raid   — Raids únicos     :  12 | Diferencia Silver↔Gold : 0 | Snapshot : append
+```
+
+**Decisiones de diseño:**
+- `MERGE INTO` garantiza idempotencia: re-ejecuciones no duplican filas.
+- Las columnas inmutables (`first_seen_date`, `event_date`) se excluyen del
+  `UPDATE SET` para preservar el historial temporal del catálogo Iceberg.
+- Particionado por `event_date` en `dim_raid` evita el antipatrón *small files*
+  que generaría usar `raid_id` (UUID, alta cardinalidad) como partición en MinIO.
+- `dim_raid` calcula `raid_size` directamente desde Silver con
+  `countDistinct("source_player_id")`, eliminando la dependencia en
+  `fact_raid_summary` y haciendo el script autocontenido.
 
 ***
 
@@ -349,13 +375,13 @@ python -m pytest
 | **4** | Gold Medallion (dim_player, dim_raid, facts, validación) | ✅ Completa |
 | **5** | ETL Silver→Gold (Spark)  | ✅ Completa |
 | **6** | Orquestación mediante Dagster  | ✅ Completa |
+| **7** | Table format | Apache Iceberg 1.x (catálogo Hadoop, MinIO) | ✅ Completa |
 
 
 ### Roadmap
 
 | Fase | Descripción | Tecnología prevista |
 | :-- | :-- | :-- |
-| **7** | Integración ACID | Apache Iceberg |
 | **8** | Visualización y APIs | Grafana + Apache Superset + FastAPI |
 | **9** | Modelado IA | MLflow + PyCaret + CuDF (RTX 3050) |
 | **10** | Datos reales | Warcraft Logs API |
@@ -369,7 +395,7 @@ python -m pytest
 | :-- | :-- | :-- | :-- |
 | DT-01 | `MinIOStorageClient.list_objects()` no pagina (límite 1000 objetos) | Media | Silver con >1000 parquets por partición |
 | DT-02 | Generador no produce eventos `player_death` en config actual | Baja | Métrica `total_deaths` siempre = 0 en Gold |
-| DT-03 | `dim_player.total_raids` siempre = 1 (upsert incremental pendiente) | Baja | Análisis multi-raid de jugadores |
+| ~~DT-03~~ | ~~`dim_player.total_raids` siempre = 1 (upsert incremental pendiente)~~ | ~~Baja~~ | ✅ Resuelto en Subfase 7.4 (MERGE INTO) |
 
 
 ***
@@ -390,15 +416,13 @@ python -m pytest
 | Contenedores | Docker, Docker Compose |
 | Testing | pytest |
 
-### Planificado (Fases 5–10)
+### Planificado (Fases 8–10)
 
 | Capa | Tecnología |
 | :-- | :-- |
-| Table format | Delta Lake → Apache Iceberg |
-| Orquestación | Dagster (asset-based) |
+| Table format | Apache Iceberg 1.x (catálogo Hadoop, MinIO) |
 | Visualización | Grafana, Apache Superset |
 | ML tracking | MLflow, PyCaret |
-| Serving APIs | FastAPI |
 | GPU computing | CuDF (RAPIDS), CUDA 12.x |
 
 

@@ -8,15 +8,7 @@ Esta fase no cambia la lógica conceptual de Bronze, Silver y Gold, sino la form
 
 ---
 
-## 2. Estado actual de la fase
-
-La Fase 7 es la fase vigente del proyecto. Dentro de ella, la subfase actualmente en ejecución es la 7.2, centrada en Silver ACID para eventos limpios.
-
-Esto implica que la fase debe documentarse como una transición en curso, no como una migración ya cerrada por completo. La arquitectura objetivo está definida, pero el foco operativo actual está en consolidar Silver como tabla Iceberg.
-
----
-
-## 3. Objetivo técnico global
+## 2. Objetivo técnico global
 
 El objetivo técnico de la fase es migrar Silver y Gold a Apache Iceberg sobre MinIO para obtener:
 
@@ -30,7 +22,7 @@ En términos de ingeniería, se pasa de almacenar solo “archivos correctos” 
 
 ---
 
-## 4. Por qué Iceberg entra ahora
+## 3. Por qué Iceberg entra ahora
 
 Hasta la Fase 6, las capas Silver y Gold ya son funcionales, pero descansan sobre directorios de archivos Parquet. Ese diseño funciona para lotes y prototipado, pero introduce limitaciones estructurales cuando el proyecto busca escalabilidad real y evolución operativa.
 
@@ -45,7 +37,7 @@ Apache Iceberg entra en Fase 7 precisamente para resolver ese cuello de botella 
 
 ---
 
-## 5. Problemas concretos del estado anterior
+## 4. Problemas concretos del estado anterior
 
 ### Sin ACID
 
@@ -65,7 +57,7 @@ Trabajar solo con Parquet sin capa de catálogo/metadata fuerte complica la inte
 
 ---
 
-## 6. Encaje con la visión del proyecto
+## 5. Encaje con la visión del proyecto
 
 Apache Iceberg encaja con el objetivo de “producción + escalabilidad real” por tres motivos principales:
 
@@ -77,7 +69,7 @@ Iceberg es adecuado aquí porque se apoya en un catálogo independiente del moto
 
 ---
 
-## 7. Qué es Iceberg en este proyecto
+## 6. Qué es Iceberg en este proyecto
 
 En el contexto del proyecto, Iceberg debe entenderse como una capa de metadatos que organiza y gobierna tablas apoyadas en archivos Parquet. Añade snapshots inmutables, catálogo de tablas y semántica transaccional sin exigir cambiar de paradigma de almacenamiento.
 
@@ -85,7 +77,7 @@ No sustituye MinIO ni la arquitectura Medallion. Lo que hace es volver mucho má
 
 ---
 
-## 8. Impacto por capa Medallion
+## 7. Impacto por capa Medallion
 
 | Capa | Estado previo | Estado objetivo con Iceberg |
 |---|---|---|
@@ -97,7 +89,7 @@ El cambio, por tanto, se concentra en Silver y Gold. Bronze permanece estable po
 
 ---
 
-## 9. Subfases definidas
+## 8. Subfases definidas
 
 La fase se divide en cinco subfases ya definidas:
 
@@ -111,7 +103,7 @@ Esta secuencia es correcta desde un punto de vista de ingeniería: primero se va
 
 ---
 
-## 10. Estado real de avance
+## 9. Estado real de avance
 
 ### 7.1 ya aterrizada
 
@@ -127,7 +119,7 @@ Las tablas Gold ACID de hechos, las dimensiones y las correcciones apoyadas en t
 
 ---
 
-## 11. Decisiones técnicas confirmadas
+## 10. Decisiones técnicas confirmadas
 
 Las decisiones técnicas explícitas para esta fase son:
 
@@ -142,7 +134,7 @@ Estas decisiones son coherentes con una fase de transición hacia tablas gestion
 
 ---
 
-## 12. Papel de PySpark 3.5
+## 11. Papel de PySpark 3.5
 
 PySpark 3.5 se mantiene como motor principal de ejecución en esta fase. Su papel ya no es solo procesar datasets, sino operar sobre tablas Iceberg dentro de un flujo más cercano a lakehouse que a data lake basado únicamente en ficheros.
 
@@ -150,7 +142,7 @@ En otras palabras, Spark pasa de ser solo un procesador de lotes a convertirse e
 
 ---
 
-## 13. Papel del catálogo
+## 12. Papel del catálogo
 
 El catálogo tipo Hadoop sobre MinIO es una pieza central de esta fase. Su función es dar un nombre lógico estable a las tablas y conectar ese nombre con sus metadatos físicos y snapshots.
 
@@ -164,7 +156,7 @@ Esta separación es una mejora arquitectónica importante porque reduce el acopl
 
 ---
 
-## 14. Subfase 7.2: Silver ACID
+## 13. Subfase 7.2: Silver ACID
 
 La subfase activa del proyecto es 7.2, dedicada a Silver ACID para eventos limpios. Su misión es convertir Silver en una tabla Iceberg que conserve el valor de la capa refined, pero añadiendo garantías transaccionales e historial.
 
@@ -172,7 +164,7 @@ Desde la lógica Medallion, esto es una mejora del “filtro” de calidad de Si
 
 ---
 
-## 15. Qué aporta Silver Iceberg
+## 14. Qué aporta Silver Iceberg
 
 La migración de Silver a Iceberg aporta varios beneficios prácticos:
 
@@ -186,7 +178,7 @@ Silver sigue siendo la capa de eventos limpios, tipados y refinados, pero deja d
 
 ---
 
-## 16. Gold dentro de la Fase 7
+## 15. Gold dentro de la Fase 7
 
 Aunque el trabajo actual esté en Silver, la Fase 7 ya define el destino natural de Gold dentro del mismo modelo. Gold deberá evolucionar hacia tablas Iceberg separadas entre hechos y dimensiones, manteniendo la lógica semidimensional ya introducida previamente.
 
@@ -194,7 +186,7 @@ El cambio aquí no es rehacer el modelo analítico, sino materializarlo sobre un
 
 ---
 
-## 17. Relación con fases anteriores
+## 16. Relación con fases anteriores
 
 La Fase 7 reutiliza todo lo construido antes:
 
@@ -208,7 +200,7 @@ Lo que hace ahora Iceberg es elevar la madurez del sistema sin romper esa evoluc
 
 ---
 
-## 18. Relación con fases posteriores
+## 17. Relación con fases posteriores
 
 La Fase 7 prepara el terreno para las fases siguientes. Una vez Silver y Gold estén soportadas sobre Iceberg, servir métricas por API, conectar dashboards, entrenar ML o integrar datos reales tendrá una base más robusta.
 
@@ -216,7 +208,7 @@ Esto es importante porque una capa Gold consumible gana mucho valor cuando está
 
 ---
 
-## 19. Resumen técnico
+## 18. Resumen técnico
 
 | Elemento | Decisión |
 |---|---|
@@ -232,7 +224,7 @@ Esto es importante porque una capa Gold consumible gana mucho valor cuando está
 
 ---
 
-## 20. Criterio de cierre de la fase
+## 19. Criterio de cierre de la fase
 
 La Fase 7 podrá darse por cerrada cuando se cumplan estas condiciones:
 
