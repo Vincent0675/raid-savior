@@ -6,6 +6,7 @@ Phase: 2.1 (HTTP Receiver - Basic)
 
 import pytest
 import json
+from unittest.mock import MagicMock
 
 from scripts.api.receiver import create_app
 from src.generators.raid_event_generator import WoWEventGenerator
@@ -13,8 +14,13 @@ from src.generators.raid_event_generator import WoWEventGenerator
 
 @pytest.fixture
 def client():
-    """Flask test client."""
-    app = create_app()
+    """Flask test client con storage mockeado (sin MinIO real)."""
+    mock_storage = MagicMock()
+    mock_storage.save_batch.return_value = {
+        "status": "success",
+        "s3_path": "s3://bronze/wow_raid_events/v1/raidid=test/batch_abc.json",
+    }
+    app = create_app(storage=mock_storage)
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client

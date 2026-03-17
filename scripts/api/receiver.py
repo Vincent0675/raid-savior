@@ -6,7 +6,7 @@ Phase: 2 (HTTP Receiver + Bronze Persistence)
 Endpoint: POST /events
 """
 
-from flask import Flask, request, jsonify, Response, stream_with_context
+from flask import Flask, request, jsonify, Response, stream_with_context, current_app
 from pydantic import ValidationError
 from datetime import datetime, timezone
 import uuid
@@ -19,13 +19,9 @@ from src.api.sse_bus import sse_bus
 
 app = Flask(__name__)
 
-# Inicializar cliente de almacenamiento (singleton para toda la app)
-storage_client = MinIOStorageClient()
-
 
 @app.route("/health", methods=["GET"])
 def health_check():
-    """Health check endpoint for monitoring."""
     return jsonify(
         {
             "status": "healthy",
@@ -37,25 +33,17 @@ def health_check():
 
 @app.route("/events", methods=["POST"])
 def receive_events():
-    """
-    Receive and validate WoW raid events, then persist to Bronze.
-
-    Expects JSON array of events.
-    Returns 201 with batch_id if successful, 400 if validation fails.
-    """
     if not request.is_json:
         return jsonify({"error": "Content-Type must be application/json"}), 400
 
     payload = request.get_json()
 
-    # Ensure payload is a list
     if not isinstance(payload, list):
         return jsonify({"error": "Payload must be JSON array of events"}), 400
 
     if len(payload) == 0:
         return jsonify({"error": "Empty payload"}), 400
 
-    # Validate each event with Pydantic
     validated_events = []
     errors = []
 
@@ -68,28 +56,20 @@ def receive_events():
                 {"index": idx, "event_data": event_data, "errors": e.errors()}
             )
 
-    # If any validation failed, reject entire batch
     if errors:
         return jsonify(
             {
                 "status": "validation_failed",
                 "valid_count": len(validated_events),
                 "invalid_count": len(errors),
-                "errors": errors[:5],  # Return first 5 errors
+                "errors": errors[:5],
             }
         ), 400
 
-    # Publicar eventos validados en el bus SSE
     for ev in validated_events:
-        ev_dict = ev.model_dump(mode="json")
-        sse_bus.publish(ev_dict)
+        sse_bus.publish(ev.model_dump(mode="json"))
 
-    # --- NUEVA LÓGICA: Persistencia en Bronze ---
-
-    # Extraer raid_id del primer evento (asumimos que todos son de la misma raid)
     raid_id = validated_events[0].raid_id
-
-    # Crear el batch envelope
     batch_id = str(uuid.uuid4())
     ingest_timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -100,10 +80,11 @@ def receive_events():
         "events": [event.model_dump(mode="json") for event in validated_events],
     }
 
-    # Guardar en MinIO Bronze
+    # ← Ahora lo obtiene del contexto de la app, no de un global
+    storage_client = current_app.config["storage_client"]
+
     try:
         storage_result = storage_client.save_batch(raid_id, batch_data)
-
         return jsonify(
             {
                 "status": "accepted",
@@ -112,10 +93,9 @@ def receive_events():
                 "storage": storage_result,
                 "timestamp": ingest_timestamp,
             }
-        ), 201  # 201 Created
+        ), 201
 
     except Exception as e:
-        # Si falla el guardado, retornar error 500
         return jsonify(
             {
                 "status": "storage_error",
@@ -143,13 +123,15 @@ def stream_events():
         stream_with_context(event_stream()),
         mimetype="text/event-stream",
     )
-    # CORS abierto para desarrollo: permite cualquier origen
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
 
-def create_app():
-    """Application factory pattern for testing."""
+def create_app(storage=None):
+    """Application factory con DI. Si no se inyecta storage, crea uno real."""
+    if storage is None:
+        storage = MinIOStorageClient()  # ← Instancia real solo en producción
+    app.config["storage_client"] = storage
     return app
 
 
@@ -165,4 +147,5 @@ if __name__ == "__main__":
     print("Storage: MinIO Bronze Layer")
     print("Starting server on http://localhost:5000")
     print("=" * 70)
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app_instance = create_app()
+    app_instance.run(host="0.0.0.0", port=5000, debug=True)

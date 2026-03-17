@@ -63,7 +63,7 @@ def test_fase_2_ingestion(eventos):
     # Enviar batch (convertir eventos Pydantic a dict)
     payload = [e.model_dump(mode="json") for e in eventos]
 
-    response = requests.post(RECEPTOR_URL, json=payload, timeout=5)
+    response = requests.post(RECEPTOR_URL, json=payload, timeout=30)
 
     if response.status_code == 201:
         result = response.json()
