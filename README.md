@@ -4,8 +4,8 @@
 **Autor:** Byron V. Blatch Rodriguez   
 **Profesor:** Francisco Javier Ortega   
 **Repositorio:** [github.com/Vincent0675/raid-savior](https://github.com/Vincent0675/raid-savior)   
-**Estado:** Fase 7, implementación ACID mediante Apache Iceberg (completada)   
-**Última actualización:** 12 de marzo de 2026.   
+**Estado:** Fase 7 | Integración Apache Iceberg con Time Travel efectivo (completada)   
+**Última actualización:** 18 de marzo de 2026.   
 
 ***
 
@@ -59,6 +59,55 @@ y formato columnar Parquet en Silver/Gold.
 | Hardware | ASUS TUF A15 · RTX 3050 · Pop!\_OS |
 | Coherencia Gold | ✅ 0 fallos |
 
+### Time Travel Apache Iceberg
+
+```
+>>> Estado POST-corrección (tabla actual):
++-------+----------+----------+
+|raid_id|boss_name |event_date|
++-------+----------+----------+
+|raid001|Onyxia    |2026-02-25|
+|raid002|Ragnaros  |2026-02-25|
+|raid003|Nefarian  |2026-02-25|
+|raid004|CThun     |2026-02-25|
+|raid005|KelThuzad |2026-02-25|
+|raid006|Illidan   |2026-02-25|
+|raid007|Arthas    |2026-02-25|
+|raid008|Archimonde|2026-02-25|
+|raid009|Kiljaeden |2026-02-25|
+|raid010|Deathwing |2026-02-25|
+|raid666|Sargeras  |2026-03-05|
+|raid999|The Jailer|2026-03-05|
++-------+----------+----------+
+
+
+>>> Estado PRE-corrección (VERSION AS OF 5290609065853948740):
++-------+------------+----------+
+|raid_id|boss_name   |event_date|
++-------+------------+----------+
+|raid001|Unknown Boss|2026-02-25|
+|raid002|Unknown Boss|2026-02-25|
+|raid003|Unknown Boss|2026-02-25|
+|raid004|Unknown Boss|2026-02-25|
+|raid005|Unknown Boss|2026-02-25|
+|raid006|Unknown Boss|2026-02-25|
+|raid007|Unknown Boss|2026-02-25|
+|raid008|Unknown Boss|2026-02-25|
+|raid009|Unknown Boss|2026-02-25|
+|raid010|Unknown Boss|2026-02-25|
+|raid666|Unknown Boss|2026-03-05|
+|raid999|Unknown Boss|2026-03-05|
++-------+------------+----------+
+
+
+>>> HISTORIAL DE SNAPSHOTS — wow.gold.dim_raid
++-------------------+-----------------------+---------+
+|snapshot_id        |committed_at           |operation|
++-------------------+-----------------------+---------+
+|5290609065853948740|2026-03-12 17:36:33.781|append   |
+|4677864922372387292|2026-03-18 12:18:18.982|overwrite|
++-------------------+-----------------------+---------+
+```
 
 ***
 
