@@ -22,7 +22,18 @@ En términos de ingeniería, se pasa de almacenar solo “archivos correctos” 
 
 ---
 
-## 3. Por qué Iceberg entra ahora
+## 3. Estado actual de la fase
+
+La Fase 7 está **completada** a fecha 2026-03-18. Todas las subfases definidas
+(7.1 → 7.5) han sido ejecutadas y verificadas.
+
+El pipeline Medallion completo opera sobre tablas Iceberg ACID en MinIO, con
+time travel funcional demostrado y correcciones de negocio aplicadas sobre base
+versionada.
+
+---
+
+## 4. Por qué Iceberg entra ahora
 
 Hasta la Fase 6, las capas Silver y Gold ya son funcionales, pero descansan sobre directorios de archivos Parquet. Ese diseño funciona para lotes y prototipado, pero introduce limitaciones estructurales cuando el proyecto busca escalabilidad real y evolución operativa.
 
@@ -37,7 +48,7 @@ Apache Iceberg entra en Fase 7 precisamente para resolver ese cuello de botella 
 
 ---
 
-## 4. Problemas concretos del estado anterior
+## 5. Problemas concretos del estado anterior
 
 ### Sin ACID
 
@@ -57,7 +68,7 @@ Trabajar solo con Parquet sin capa de catálogo/metadata fuerte complica la inte
 
 ---
 
-## 5. Encaje con la visión del proyecto
+## 6. Encaje con la visión del proyecto
 
 Apache Iceberg encaja con el objetivo de “producción + escalabilidad real” por tres motivos principales:
 
@@ -69,7 +80,7 @@ Iceberg es adecuado aquí porque se apoya en un catálogo independiente del moto
 
 ---
 
-## 6. Qué es Iceberg en este proyecto
+## 7. Qué es Iceberg en este proyecto
 
 En el contexto del proyecto, Iceberg debe entenderse como una capa de metadatos que organiza y gobierna tablas apoyadas en archivos Parquet. Añade snapshots inmutables, catálogo de tablas y semántica transaccional sin exigir cambiar de paradigma de almacenamiento.
 
@@ -77,7 +88,7 @@ No sustituye MinIO ni la arquitectura Medallion. Lo que hace es volver mucho má
 
 ---
 
-## 7. Impacto por capa Medallion
+## 8. Impacto por capa Medallion
 
 | Capa | Estado previo | Estado objetivo con Iceberg |
 |---|---|---|
@@ -89,7 +100,7 @@ El cambio, por tanto, se concentra en Silver y Gold. Bronze permanece estable po
 
 ---
 
-## 8. Subfases definidas
+## 9. Subfases definidas
 
 La fase se divide en cinco subfases ya definidas:
 
@@ -103,23 +114,50 @@ Esta secuencia es correcta desde un punto de vista de ingeniería: primero se va
 
 ---
 
-## 9. Estado real de avance
+## 10. Estado real de avance
 
-### 7.1 ya aterrizada
+### 7.1 — Catálogo Iceberg sobre MinIO ✅
 
-La documentación indica que ya existe la subfase de catálogo Iceberg sobre MinIO, apoyada por `inspect_iceberg_connection.py`. También consta un ping-test funcional en `wow.gold.ping_test` con time travel.
+Catálogo tipo Hadoop sobre MinIO operativo. Namespaces `wow.silver` y
+`wow.gold` creados y funcionales.
 
-### 7.2 en proceso
+### 7.2 — Silver ACID ✅
 
-El foco activo de desarrollo está en Silver ACID. Esto significa que la prioridad actual es transformar la capa de eventos limpios desde directorios Parquet particionados hacia una tabla Iceberg transaccional y consultable con historial.
+`wow.silver.raid_events` materializada como tabla Iceberg ACID.
+~600 000 eventos, particionada por `raid_id / ingest_date`.
+Diferencia Parquet vs Iceberg = 0 filas.
 
-### 7.3, 7.4 y 7.5 como continuación
+### 7.3 — Gold ACID: tablas de hechos ✅
 
-Las tablas Gold ACID de hechos, las dimensiones y las correcciones apoyadas en time travel forman parte de la arquitectura objetivo de la fase, pero no deben documentarse como cierre ya completado.
+- `wow.gold.fact_raid_summary` — 12 filas
+- `wow.gold.fact_player_raid_stats` — operativa
+
+### 7.4 — Gold ACID: dimensiones ✅
+
+- `wow.gold.dim_player` — 312 jugadores, patrón MERGE INTO, snapshot: `append`
+- `wow.gold.dim_raid` — 12 raids, patrón MERGE INTO, snapshot: `append`
+
+Workaround activo en `spark_session.py`:
+`.config("spark.sql.iceberg.vectorization.enabled", "false")` — anti-SIGSEGV
+Arrow en entorno local. Ver `Fase_7-4_troubleshooting_iceberg_vectorization.md`.
+
+### 7.5 — Time travel y correcciones de negocio ✅
+
+Demostrado sobre `wow.gold.dim_raid`:
+
+- `VERSION AS OF <snapshot_id>` y `TIMESTAMP AS OF '<ts>'` verificados
+- `UPDATE boss_name` ejecutado: placeholder `Unknown Boss` → nombres reales
+  para los 12 raids (`Onyxia`, `Ragnaros`, `Nefarian`, etc.)
+- Inmutabilidad del snapshot previo confirmada: el snapshot `append` original
+  (`5290609065853948740`, 2026-03-12) sigue devolviendo el estado pre-corrección
+  después del snapshot `overwrite` generado por el UPDATE
+  (`4677864922372387292`, 2026-03-18)
+
+Script: `src/etl/gold_iceberg_time_travel.py` — **demostración, no ETL de producción**.
 
 ---
 
-## 10. Decisiones técnicas confirmadas
+## 11. Decisiones técnicas confirmadas
 
 Las decisiones técnicas explícitas para esta fase son:
 
@@ -134,7 +172,7 @@ Estas decisiones son coherentes con una fase de transición hacia tablas gestion
 
 ---
 
-## 11. Papel de PySpark 3.5
+## 12. Papel de PySpark 3.5
 
 PySpark 3.5 se mantiene como motor principal de ejecución en esta fase. Su papel ya no es solo procesar datasets, sino operar sobre tablas Iceberg dentro de un flujo más cercano a lakehouse que a data lake basado únicamente en ficheros.
 
@@ -142,7 +180,7 @@ En otras palabras, Spark pasa de ser solo un procesador de lotes a convertirse e
 
 ---
 
-## 12. Papel del catálogo
+## 13. Papel del catálogo
 
 El catálogo tipo Hadoop sobre MinIO es una pieza central de esta fase. Su función es dar un nombre lógico estable a las tablas y conectar ese nombre con sus metadatos físicos y snapshots.
 
@@ -156,7 +194,7 @@ Esta separación es una mejora arquitectónica importante porque reduce el acopl
 
 ---
 
-## 13. Subfase 7.2: Silver ACID
+## 14. Subfase 7.2: Silver ACID
 
 La subfase activa del proyecto es 7.2, dedicada a Silver ACID para eventos limpios. Su misión es convertir Silver en una tabla Iceberg que conserve el valor de la capa refined, pero añadiendo garantías transaccionales e historial.
 
@@ -164,7 +202,7 @@ Desde la lógica Medallion, esto es una mejora del “filtro” de calidad de Si
 
 ---
 
-## 14. Qué aporta Silver Iceberg
+## 15. Qué aporta Silver Iceberg
 
 La migración de Silver a Iceberg aporta varios beneficios prácticos:
 
@@ -178,7 +216,7 @@ Silver sigue siendo la capa de eventos limpios, tipados y refinados, pero deja d
 
 ---
 
-## 15. Gold dentro de la Fase 7
+## 16. Gold dentro de la Fase 7
 
 Aunque el trabajo actual esté en Silver, la Fase 7 ya define el destino natural de Gold dentro del mismo modelo. Gold deberá evolucionar hacia tablas Iceberg separadas entre hechos y dimensiones, manteniendo la lógica semidimensional ya introducida previamente.
 
@@ -186,7 +224,7 @@ El cambio aquí no es rehacer el modelo analítico, sino materializarlo sobre un
 
 ---
 
-## 16. Relación con fases anteriores
+## 17. Relación con fases anteriores
 
 La Fase 7 reutiliza todo lo construido antes:
 
@@ -200,7 +238,7 @@ Lo que hace ahora Iceberg es elevar la madurez del sistema sin romper esa evoluc
 
 ---
 
-## 17. Relación con fases posteriores
+## 18. Relación con fases posteriores
 
 La Fase 7 prepara el terreno para las fases siguientes. Una vez Silver y Gold estén soportadas sobre Iceberg, servir métricas por API, conectar dashboards, entrenar ML o integrar datos reales tendrá una base más robusta.
 
@@ -208,34 +246,36 @@ Esto es importante porque una capa Gold consumible gana mucho valor cuando está
 
 ---
 
-## 18. Resumen técnico
+## 19. Resumen técnico
 
-| Elemento | Decisión |
-|---|---|
-| Fase actual | Fase 7 |
-| Subfase activa | 7.2 Silver ACID |
-| Objetivo global | migrar Silver/Gold a Apache Iceberg |
-| Storage base | MinIO |
-| Motor principal | PySpark 3.5 |
-| Catálogo | Hadoop catalog |
-| Namespaces | `wow.silver`, `wow.gold` |
-| Beneficios buscados | ACID, time travel, schema evolution, mutaciones controladas |
-| Estado | en proceso |
-
----
-
-## 19. Criterio de cierre de la fase
-
-La Fase 7 podrá darse por cerrada cuando se cumplan estas condiciones:
-
-- catálogo Iceberg operativo sobre MinIO
-- Silver materializada como tabla Iceberg ACID
-- Gold materializada en tablas Iceberg para hechos y dimensiones
-- soporte funcional de time travel
-- capacidad de aplicar correcciones de negocio sobre una base versionada
-- continuidad de la arquitectura Medallion sin ruptura de capas
+| Elemento             | Decisión / Resultado                                      |
+|----------------------|-----------------------------------------------------------|
+| Fase actual          | Fase 7 — **COMPLETADA** 2026-03-18                        |
+| Subfase completada   | 7.5 Time travel y correcciones de negocio                 |
+| Objetivo global      | migrar Silver/Gold a Apache Iceberg — **alcanzado**       |
+| Storage base         | MinIO                                                     |
+| Motor principal      | PySpark 3.5                                               |
+| Catálogo             | Hadoop catalog                                            |
+| Namespaces           | `wow.silver`, `wow.gold`                                  |
+| Beneficios obtenidos | ACID, time travel, schema evolution, mutaciones versionadas |
+| Workaround activo    | Arrow vectorization desactivada (entorno local)           |
+| Estado               | **completada**                                            |
 
 ---
 
-**Estado de la fase:** actual  
-**Rol de la fase:** transición de Silver/Gold desde Parquet gestionado por carpetas hacia tablas Iceberg con metadatos transaccionales
+## 20. Criterio de cierre de la fase
+
+| Criterio                                                          | Estado |
+|-------------------------------------------------------------------|--------|
+| Catálogo Iceberg operativo sobre MinIO                            | ✅     |
+| Silver materializada como tabla Iceberg ACID                      | ✅     |
+| Gold materializada en tablas Iceberg para hechos y dimensiones    | ✅     |
+| Soporte funcional de time travel                                  | ✅     |
+| Correcciones de negocio sobre base versionada                     | ✅     |
+| Continuidad de la arquitectura Medallion sin ruptura de capas     | ✅     |
+
+**Fase 7 cerrada el 2026-03-18.**
+
+---
+
+**Rol de la fase:** transición de Silver/Gold desde Parquet gestionado por carpetas hacia tablas Iceberg con metadatos transaccionales. Fase cerrada con todas las capacidades ACID, time travel y mutaciones versionadas operativas.

@@ -6,7 +6,8 @@ La Fase 7 introduce Apache Iceberg en las capas Silver y Gold del pipeline para 
 
 ## Estado actual
 
-La Fase 7 es la fase actual del proyecto. En este momento, el trabajo activo se encuentra en la Subfase 7.2, centrada en construir la capa Silver como tabla Iceberg ACID para eventos limpios.
+La Fase 7 está **completada** a fecha 2026-03-18. Todas las subfases (7.1 → 7.5)
+han sido ejecutadas y verificadas sobre el entorno local con PySpark 3.5 y MinIO.
 
 ## Qué problema resuelve
 
@@ -46,11 +47,23 @@ No incluye:
 - Mantener compatibilidad con buenas prácticas de Python 3.10.x
 - Posible soporte adicional con Pytest, Ruff y MyPy
 
-## Resultado esperado
+## Resultados obtenidos
 
-La Fase 7 convertirá Silver y Gold en capas más robustas, trazables y preparadas para producción real. Con Iceberg, el pipeline gana una base moderna para crecer en volumen, interoperar con más motores y soportar cambios futuros sin rehacer el layout físico del almacenamiento.
+La Fase 7 ha convertido Silver y Gold en capas ACID con historial consultable.
+Las tablas Iceberg están operativas sobre MinIO con soporte de time travel
+demostrado, mutaciones versionadas aplicadas y continuidad total de la
+arquitectura Medallion.
+
+Tablas resultantes:
+
+- `wow.silver.raid_events` — ~600 000 eventos, ACID, particionada
+- `wow.gold.fact_raid_summary` — 12 filas
+- `wow.gold.fact_player_raid_stats` — operativa
+- `wow.gold.dim_player` — 312 jugadores, MERGE INTO
+- `wow.gold.dim_raid` — 12 raids, MERGE INTO, 2 snapshots verificados con time travel
 
 ## Estado
 
-**Estado de fase:** actual  
-**Subfase activa:** 7.5 Time travel y correcciones de negocio (en proceso)
+**Estado de fase:** completada — 2026-03-18  
+**Subfase cerrada:** 7.5 Time travel y correcciones de negocio  
+**Documentación extendida:** `docs/fase_7-5_resultados.md` y `docs/architecture/fase_7_table_formats_apache_iceberg.md`
