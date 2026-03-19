@@ -22,6 +22,7 @@ class Config:
     S3_BUCKET_BRONZE = os.getenv("S3_BUCKET_BRONZE", "bronze")
     S3_BUCKET_SILVER = os.getenv("S3_BUCKET_SILVER", "silver")
     S3_BUCKET_GOLD = os.getenv("S3_BUCKET_GOLD", "gold")
+    S3_BUCKET_WAREHOUSE = os.getenv("S3_BUCKET_WAREHOUSE", "warehouse")
 
     # Pipeline Settings
     MAX_EVENTS_PER_BATCH = int(os.getenv("MAX_EVENTS_PER_BATCH", 1000))

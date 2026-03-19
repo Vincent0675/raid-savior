@@ -349,6 +349,15 @@ cd infra/minio && docker compose up -d
 ```
 #### 6. Ingresar a http://localhost:9001/, introducir las credenciales (`minio` | `minio123` por predeterminado) y crear los Buckets "bronze", "silver" y "gold".
 
+#### Resolución DNS de MinIO
+Añade esta línea a `etc/hosts` (necesario solo en desarrollo local)
+
+```bash
+echo "127.0.0.1 minio" | sudo tee -a /etc/hosts
+```
+
+Esto permite que Spark y PyIceberg resuelvan el hostname minio
+
 ***
 
 ## 7. Ingesta Principal — Receptor HTTP en tiempo real

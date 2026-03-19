@@ -44,8 +44,10 @@ def get_spark_session(app_name: str = "WoWRaidTelemetry") -> SparkSession:
             "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
         )
         .config("spark.sql.catalog.wow", "org.apache.iceberg.spark.SparkCatalog")
-        .config("spark.sql.catalog.wow.type", "hadoop")
-        .config("spark.sql.catalog.wow.warehouse", "s3a://warehouse/")
+        .config("spark.sql.catalog.wow.type", "rest")
+        .config("spark.sql.catalog.wow.uri", "http://localhost:8181")
+        .config("spark.sql.catalog.wow.s3a.endpoint", "http://minio:9000")
+        .config("spark.sql.catalog.wow.s3a.path-style-access", "true")
         .config("spark.sql.shuffle.partitions", "8")
         .config(
             "spark.driver.extraJavaOptions", "-XX:+UseSerialGC -XX:-TieredCompilation"

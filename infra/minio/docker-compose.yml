@@ -1,34 +1,81 @@
-services:
-  minio:
-    image: minio/minio:latest
-    container_name: wow-minio
-    command: server --console-address :9001 /data
-    environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 2s
-      timeout: 2s
-      retries: 30
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      until wget -qO- http://minio:9000/minio/health/live >/dev/null 2>&1; do
-        echo 'Waiting for MinIO...';
-        sleep 1;
-      done;
-      mc alias set local http://minio:9000 minio minio123 &&
-      mc mb -p local/bronze || true &&
-      echo 'Bucket bronze OK'
-      "
-volumes:
-  minio_data:
+  services:
+
+    minio:
+      image: minio/minio:latest
+      container_name: wow-minio
+      command: server --console-address :9001 /data
+      environment:
+        MINIO_ROOT_USER: minio
+        MINIO_ROOT_PASSWORD: minio123
+      ports:
+        - "9000:9000"
+        - "9001:9001"
+      volumes:
+        - minio_data:/data
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://minio:9000/minio/health/live"]
+        interval: 2s
+        timeout: 2s
+        retries: 30
+      networks:
+        - raid-network
+
+    minio-init:
+      image: minio/mc:latest
+      container_name: wow-minio-init
+      depends_on:
+        minio:
+          condition: service_healthy
+      entrypoint: >
+        /bin/sh -c "
+        mc alias set local http://minio:9000 minio minio123 &&
+        mc mb -p local/bronze || true &&
+        mc mb -p local/warehouse || true &&
+        echo 'Buckets OK'
+        "
+      networks:
+        - raid-network
+
+    iceberg-rest-init:
+      image: busybox
+      container_name: wow-iceberg-rest-init
+      user: root
+      volumes:
+        - iceberg_catalog:/catalog
+      command: ["sh", "-c", "chown -R 1000:1000 /catalog && chmod 755 /catalog"]
+      networks:
+        - raid-network
+
+    iceberg-rest:
+      image: tabulario/iceberg-rest:latest
+      container_name: wow-iceberg-rest
+      ports:
+        - "8181:8181"
+      environment:
+        - AWS_ACCESS_KEY_ID=minio
+        - AWS_SECRET_ACCESS_KEY=minio123
+        - AWS_REGION=us-east-1
+        - CATALOG_WAREHOUSE=s3://warehouse/
+        - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+        - CATALOG_S3_ENDPOINT=http://minio:9000
+        - CATALOG_S3_PATH__STYLE__ACCESS=true # ← SDK v2: doble guión bajo
+        - CATALOG_URI=jdbc:sqlite:/catalog/iceberg_catalog.db
+      volumes:
+        - iceberg_catalog:/catalog
+      depends_on:
+        minio:
+          condition: service_healthy
+        iceberg-rest-init:
+          condition: service_completed_successfully
+      networks:
+        - raid-network
+      restart: unless-stopped
+
+  networks:
+    raid-network:
+      driver: bridge
+      name: raid-network
+
+  volumes:
+    minio_data:
+    iceberg_catalog:
