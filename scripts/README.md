@@ -6,6 +6,7 @@ No son tests automatizados — se ejecutan directamente con `python`.
 | Directorio | Propósito |
 |---|---|
 | `api/` | Receptor HTTP y endpoints |
+| `bootstrap/` | Inicialización y registro idempotente de tablas/catálogo |
 | `etl/` | Inspección y diagnóstico del pipeline ETL |
 | `analytics/` | Inspección de capas Bronze, Silver y Gold |
 | `generators/` | Generación de datasets sintéticos |

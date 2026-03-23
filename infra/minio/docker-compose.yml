@@ -47,7 +47,7 @@
         - raid-network
 
     iceberg-rest:
-      image: tabulario/iceberg-rest:latest
+      image: tabulario/iceberg-rest:0.11.0
       container_name: wow-iceberg-rest
       ports:
         - "8181:8181"

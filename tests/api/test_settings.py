@@ -29,6 +29,7 @@ def test_settings_carga_desde_env(monkeypatch):
     assert s.s3_access_key == "minioadmin"
     assert s.workers == 2  # valor por defecto
     assert s.debug is False  # valor por defecto
+    assert s.iceberg_rest_uri == "http://localhost:8181"
 
 
 def test_settings_valores_por_defecto(monkeypatch):
@@ -45,3 +46,5 @@ def test_settings_valores_por_defecto(monkeypatch):
     assert s.api_port == 8000
     assert s.timeout == 120
     assert s.s3_bucket_gold == "gold"
+    assert s.iceberg_catalog_name == "wow"
+    assert "gold.fact_raid_summary" in s.iceberg_expected_tables

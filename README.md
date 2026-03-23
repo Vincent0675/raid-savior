@@ -4,8 +4,8 @@
 **Autor:** Byron V. Blatch Rodriguez   
 **Profesor:** Francisco Javier Ortega   
 **Repositorio:** [github.com/Vincent0675/raid-savior](https://github.com/Vincent0675/raid-savior)   
-**Estado:** Fase 7 | Integración Apache Iceberg con Time Travel efectivo (completada)   
-**Última actualización:** 18 de marzo de 2026.   
+**Estado:** Fase 8 | Capa de serving APIs y visualización (ejecución manual validada)   
+**Última actualización:** 23 de marzo de 2026.   
 
 ***
 
@@ -15,6 +15,123 @@ Pipeline de telemetría **event-driven** que simula raids de World of Warcraft
 sobre una arquitectura **Medallion** completa (Bronze → Silver → Gold) con
 almacenamiento en MinIO (S3-compatible), validación estricta con Pydantic v2
 y formato columnar Parquet en Silver/Gold.
+
+## Pipeline actualizado
+
+El flujo operativo actual de Fase 8 conecta la ingesta con serving vía Iceberg REST Catalog.
+
+### Arquitectura por etapas
+
+1. **Ingesta**: `scripts/api/receiver.py` valida eventos (`Pydantic`) y persiste batches en `bronze`.
+2. **Bronze -> Silver**: `scripts/etl/run_bronze_to_silver.py` limpia y tipa eventos en Iceberg (`silver.raid_events`).
+3. **Silver -> Gold**: jobs Spark generan tablas de negocio (`gold.*`) en Iceberg.
+4. **Catalogo REST**: `iceberg-rest` expone metadata transaccional para Spark y PyIceberg.
+5. **API de consumo**: FastAPI (`src/api/main.py`) consulta Iceberg via `IcebergService`.
+6. **Visualizacion**: capa API lista; dashboards Grafana/Infinity y Superset quedan planificados.
+
+```mermaid
+flowchart LR
+    A[Generador/Replayer] --> B[Flask Receiver\nPOST /events]
+    B --> C[Bronze\nMinIO bucket bronze]
+    C --> D[Bronze to Silver ETL]
+    D --> E[Silver\nIceberg silver.raid_events]
+    E --> F[Silver to Gold ETL Spark]
+    F --> G[Gold\nIceberg gold.*]
+    G --> H[Iceberg REST Catalog\nlocalhost:8181]
+    H --> I[FastAPI Serving\nhealth, catalog, raids, metrics]
+    I --> J[Grafana/Infinity o Superset\nplanificado]
+```
+
+### Requisitos previos y entorno
+
+- Docker y Docker Compose instalados.
+- Entorno conda/mamba `wow-telemetry` creado desde `environment.yml`.
+- Dependencias del proyecto instaladas dentro del entorno.
+- Ejecutar comandos Python/tests como `mamba run -n wow-telemetry <comando>`.
+
+```bash
+mamba env create -f environment.yml
+mamba run -n wow-telemetry pip install -e .[dev]
+docker compose -f infra/minio/docker-compose.yml up -d
+```
+
+### Procedimiento manual end-to-end (reproducible)
+
+Ejecutar desde la raiz del repo (`/home/vincent/Refresh/raid-savior`).
+
+1) **Levantar receptor HTTP (terminal 1)**
+
+```bash
+mamba run -n wow-telemetry python scripts/api/receiver.py
+```
+
+2) **Bootstrap del catalogo REST (terminal 2)**
+
+```bash
+mamba run -n wow-telemetry python scripts/bootstrap/register_tables_rest_catalog.py
+```
+
+3) **Verificar test suite API**
+
+```bash
+S3_ENDPOINT_URL=http://localhost:9000 \
+S3_ACCESS_KEY=minio \
+S3_SECRET_KEY=minio123 \
+WAREHOUSE_BUCKET=warehouse \
+ICEBERG_REST_URI=http://localhost:8181 \
+mamba run -n wow-telemetry pytest tests/api -q
+```
+
+4) **Smoke de catalogo REST (integracion)**
+
+```bash
+S3_ENDPOINT_URL=http://localhost:9000 \
+S3_ACCESS_KEY=minio \
+S3_SECRET_KEY=minio123 \
+WAREHOUSE_BUCKET=warehouse \
+ICEBERG_REST_URI=http://localhost:8181 \
+mamba run -n wow-telemetry pytest tests/integration/test_iceberg_rest_catalog_smoke.py -q
+```
+
+5) **Smoke de endpoints de negocio con catalogo real**
+
+```bash
+S3_ENDPOINT_URL=http://localhost:9000 \
+S3_ACCESS_KEY=minio \
+S3_SECRET_KEY=minio123 \
+WAREHOUSE_BUCKET=warehouse \
+ICEBERG_REST_URI=http://localhost:8181 \
+mamba run -n wow-telemetry pytest tests/integration/test_api_business_endpoints_smoke.py -q
+```
+
+6) **Arrancar FastAPI y validar endpoints por curl**
+
+```bash
+S3_ENDPOINT_URL=http://localhost:9000 \
+S3_ACCESS_KEY=minio \
+S3_SECRET_KEY=minio123 \
+WAREHOUSE_BUCKET=warehouse \
+ICEBERG_REST_URI=http://localhost:8181 \
+mamba run -n wow-telemetry uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+```
+
+En otra terminal:
+
+```bash
+curl -sS http://localhost:8000/health
+curl -sS http://localhost:8000/health/readiness
+curl -sS http://localhost:8000/api/v1/catalog/namespaces
+curl -sS http://localhost:8000/api/v1/catalog/tables
+curl -sS "http://localhost:8000/raids?limit=2&offset=0"
+curl -sS http://localhost:8000/metrics/global
+curl -sS http://localhost:8000/raids/raid001
+curl -sS http://localhost:8000/raids/raid001/players
+curl -sS -i http://localhost:8000/raids/raid404
+```
+
+Evidencias reales de esta ejecucion: `docs/evidence/fase_8_evidencias.md`.
+
+Estado final operativo (checklist Go/No-Go + comandos): `docs/fase_8_estado_final.md`.
 
 **Resultados actuales del dataset de producción:**
 
@@ -47,6 +164,7 @@ y formato columnar Parquet en Silver/Gold.
 | 5 — ETL Silver→Gold (Spark) | PySpark 3.5 · S3A · MinIO | ✅ Completada |
 | 6 — Orquestación | Dagster | ✅ Completada |
 | 7 — Migración Silver/Gold a tablas ACID, MERGE INTO | Apache Iceberg | ✅ Completada |
+| 8 — Serving APIs sobre Gold | FastAPI · Pydantic Settings · PyIceberg REST · Iceberg REST Catalog | ✅ Completada |
 
 ### Rendimiento Spark (entorno local)
 
@@ -135,8 +253,8 @@ En Sistemas de Big Data el foco está en la **operacionalización** del pipeline
 
 Aquí el proyecto se usa como **backend de datos para APIs y dashboards**:
 
-- **APIs de servicio sobre Gold** (planificadas): diseño de endpoints FastAPI para exponer métricas de `fact_raid_summary` y `fact_player_raid_stats` a otros módulos de IA y frontends.   
-- **Dashboards ligeros**: integración prevista con Streamlit y paneles web para explorar rendimiento por raid/jugador y validar visualmente las métricas generadas en Gold.   
+- **APIs de servicio sobre Gold** (implementadas en Fase 8): FastAPI expone endpoints para métricas de `fact_raid_summary` y `fact_player_raid_stats` con readiness real contra REST Catalog.   
+- **Dashboards ligeros** (planificados): integración con Grafana/Infinity o Superset para explorar rendimiento por raid/jugador y validar visualmente las métricas generadas en Gold.   
 - **Preparación de datasets de entrenamiento**: extracción de features limpias y agregadas desde Gold para consumo directo por librerías de AutoML como PyCaret.   
 
 ### 2.4 Modelos de Inteligencia Artificial
@@ -434,13 +552,14 @@ python -m pytest
 | **5** | ETL Silver→Gold (Spark)  | ✅ Completa |
 | **6** | Orquestación mediante Dagster  | ✅ Completa |
 | **7** | Table format | Apache Iceberg 1.x (catálogo Hadoop, MinIO) | ✅ Completa |
+| **8** | Serving APIs (health/readiness/catalog/negocio) | FastAPI + PyIceberg REST + REST Catalog | ✅ Completa |
 
 
 ### Roadmap
 
 | Fase | Descripción | Tecnología prevista |
 | :-- | :-- | :-- |
-| **8** | Visualización y APIs | Grafana + Apache Superset + FastAPI |
+| **8.1** | Visualización de la API | Grafana + Infinity plugin o Apache Superset |
 | **9** | Modelado IA | MLflow + PyCaret + CuDF (RTX 3050) |
 | **10** | Datos reales | Warcraft Logs API |
 
@@ -466,20 +585,23 @@ python -m pytest
 | :-- | :-- |
 | Validación y schema | Pydantic v2, JSON Schema draft-07 |
 | Generación sintética | NumPy (Normal, Bernoulli), UUID v4 |
-| API e ingesta | Flask 3.x, python-dotenv |
+| API e ingesta | Flask 3.x (receiver), FastAPI 0.135 (serving), python-dotenv |
+| Configuración API | pydantic-settings (BaseSettings) |
 | Object storage | MinIO (S3-compatible), boto3 |
 | Procesamiento ETL | Pandas 2.x, PyArrow |
-| Procesamiento distribuido | PySpark 3.5.4 (local*), DuckDB |
+| Procesamiento distribuido | PySpark 3.5.8 (local) |
+| Catálogo y table format | Apache Iceberg 1.x + Iceberg REST Catalog (`tabulario/iceberg-rest:0.11.0`) + PyIceberg 0.11 |
 | Formato de almacenamiento | Apache Parquet + Snappy |
 | Contenedores | Docker, Docker Compose |
+| Entorno de ejecución | conda/mamba (`wow-telemetry`) |
 | Testing | pytest |
 
 ### Planificado (Fases 8–10)
 
 | Capa | Tecnología |
 | :-- | :-- |
-| Table format | Apache Iceberg 1.x (catálogo Hadoop, MinIO) |
-| Visualización | Grafana, Apache Superset |
+| Visualización | Grafana + Infinity plugin, Apache Superset |
+| Consulta SQL in-process en serving | DuckDB (si se habilita en la API) |
 | ML tracking | MLflow, PyCaret |
 | GPU computing | CuDF (RAPIDS), CUDA 12.x |
 

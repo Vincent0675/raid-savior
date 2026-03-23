@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+
+from src.api.services.iceberg_service import IcebergService
 
 router = APIRouter()
+iceberg_service = IcebergService()
 
 
 @router.get("")
@@ -10,5 +13,7 @@ async def health():
 
 @router.get("/readiness")
 async def readiness():
-    # Subfase 8.2: validar conexión MinIO e Iceberg aquí
-    return {"status": "ready"}
+    result = iceberg_service.check_readiness()
+    if not result["ready"]:
+        raise HTTPException(status_code=503, detail=result)
+    return {"status": "ready", **result}

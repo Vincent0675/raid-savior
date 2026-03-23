@@ -1,84 +1,152 @@
-# Fase 8: Capa de Consumo y Visualización
+# Fase 8: Capa de Consumo y Visualizacion
 
-**Estado:** 🟡 En progreso  
+**Estado:** GO condicional (iteracion 2026-03-23)  
 **Inicio:** 2026-03-18  
+**Referencia ADR:** `docs/fase_8_adr_decisiones-v3.md`
+
+Estado final operativo (1 pagina): `docs/fase_8_estado_final.md`.
 
 ---
 
-## Subfase 8.1 — Infraestructura API
+## Estado final conseguido (segun codigo actual)
 
-**Estado:** ✅ Completada
+Fase 8 queda operativa para serving de datos Gold via FastAPI + Iceberg REST Catalog,
+con readiness real en arranque y contratos de respuesta tipados en OpenAPI.
 
-- FastAPI arranca sin errores
-- `health` devuelve `{"status": "ok"}`
-- `src/api/settings.py` con `BaseSettings` independiente de Flask
-- OpenAPI docs disponibles en `/docs`
+- API principal en `src/api/main.py` con `lifespan` que falla en startup si readiness no pasa.
+- Servicio de datos en `src/api/services/iceberg_service.py` usando PyIceberg `type=rest`.
+- Registro idempotente de tablas con `scripts/bootstrap/register_tables_rest_catalog.py`.
+- Runbook operativo de recuperacion/operacion en `docs/fase_8_runbook_operativo.md`.
+- Evidencia reproducible en `docs/evidence/fase_8_evidencias.md`.
+
+## Stack tecnologico de Fase 8 (estado real)
+
+### Implementado
+
+- Serving API: FastAPI + Uvicorn.
+- Configuracion: Pydantic Settings (`src/api/settings.py`).
+- Datos: PyIceberg (`type=rest`) + Iceberg REST Catalog (`tabulario/iceberg-rest:0.11.0`).
+- Storage/infra local: MinIO + Docker Compose.
+- Validacion: pytest (`tests/api` e integracion REST Catalog).
+- Entorno reproducible: `mamba run -n wow-telemetry`.
+
+### Planificado
+
+- Visualizacion operativa en Grafana (Infinity plugin) o Apache Superset.
+- Endurecimiento de despliegue productivo (Gunicorn/workers) como perfil de despliegue, no requisito del flujo manual validado.
 
 ---
 
-## Subfase 8.2 — Registro de tablas en REST Catalog + acceso PyIceberg/DuckDB
+## Endpoints implementados y readiness real
 
-**Estado:** 🟡 En progreso — base de infraestructura completada (2026-03-19)
+### Health
 
-### Problema resuelto: tablas Gold/Silver no visibles en REST Catalog
+- `GET /health` -> `200` con `{"status":"ok"}`.
+- `GET /health/readiness`:
+  - `200` cuando REST Catalog esta disponible y no hay tablas faltantes.
+  - `503` con detalle estructurado cuando falla catalogo o faltan tablas.
 
-Las tablas Iceberg creadas por Spark en la Fase 7 usaban `HadoopCatalog` (metadata
-en filesystem S3). El REST Catalog arranca con su SQLite **vacío** — no hereda
-automáticamente esas tablas. Es necesario registrarlas explícitamente.
+Respuesta de readiness (shape real):
 
-### Corrección crítica en `docker-compose.yml`
-
-La imagen `tabulario/iceberg-rest:latest` requiere la variable en notación
-SDK v2 con **doble guión bajo** para las propiedades Java anidadas:
-
-```yaml
-# ❌ Incorrecto (SDK v1 / no reconocido por latest)
-- CATALOG_S3_PATH_STYLE_ACCESS=true
-
-# ✅ Correcto (SDK v2 — notación de propiedad Java)
-- CATALOG_S3_PATH__STYLE__ACCESS=true
+```json
+{
+  "status": "ready",
+  "ready": true,
+  "catalog_uri": "http://localhost:8181",
+  "expected_tables": ["gold.dim_player", "gold.dim_raid", "gold.fact_player_raid_stats", "gold.fact_raid_summary", "silver.raid_events"],
+  "catalog_tables": ["gold.dim_player", "gold.dim_raid", "gold.fact_player_raid_stats", "gold.fact_raid_summary", "silver.raid_events"],
+  "missing_tables": [],
+  "errors": []
+}
 ```
 
-Sin este cambio, el servidor REST no podía contactar MinIO y el
-`CALL system.register_table` fallaba con `UnknownHostException`.
+### Catalogo REST
 
-### Script de bootstrap creado
+- `GET /api/v1/catalog/namespaces` -> namespaces detectados en catalogo.
+- `GET /api/v1/catalog/tables` -> listado completo de tablas visibles.
+- Semantica de error: `503` si el catalogo no esta accesible.
 
-`scripts/bootstrap/register_tables_rest_catalog.py`
+### Endpoints de negocio
 
-- Resolución dinámica de versiones via `version-hint.text` (no hardcodea `v2`, `v3`...)
-- Compatible con metadata comprimida (`.gz.metadata.json`) y sin comprimir
-- Re-ejecutable si se pierde el volumen `iceberg_catalog`
+- `GET /raids?limit=&offset=`
+- `GET /raids/{raid_id}`
+- `GET /raids/{raid_id}/players`
+- `GET /metrics/global`
 
+Comportamiento confirmado:
 
-### Tablas registradas
+- `200` en consultas validas.
+- `404` para raid inexistente en `/{raid_id}` y `/{raid_id}/players`.
+- `503` cuando backend Iceberg/REST Catalog no esta disponible.
 
-| Namespace | Tabla | Metadata activo | Filas validadas |
-| :-- | :-- | :-- | :-- |
-| `gold` | `dim_player` | `v3.gz.metadata.json` | ✅ |
-| `gold` | `dim_raid` | `v3.gz.metadata.json` | ✅ |
-| `gold` | `fact_player_raid_stats` | `v2.gz.metadata.json` | ✅ |
-| `gold` | `fact_raid_summary` | `v2.gz.metadata.json` | ✅ (10 filas) |
-| `silver` | `raid_events` | `v2.gz.metadata.json` | ✅ |
+---
 
-### Verificación PyIceberg → Arrow
+## Contratos de respuesta (API v1)
 
-```python
-catalog = load_catalog("wow", type="rest", uri="http://localhost:8181", ...)
-catalog.list_namespaces()   # [('gold',), ('silver',)]
-catalog.list_tables("gold") # 4 tablas
-table.scan().to_arrow()     # 10 filas en fact_raid_summary
+Modelos en `src/api/schemas/responses.py`:
+
+- `RaidSummaryResponse`
+- `RaidListResponse`
+- `RaidPlayerResponse`
+- `RaidPlayersResponse`
+- `GlobalMetricsResponse`
+- `ErrorResponse`
+
+Aplicados como `response_model`/`responses` en `src/api/routes/raids.py` y
+`src/api/routes/metrics.py`, desacoplando contrato de salida respecto al schema
+de ingesta (alineado con ADR-8-05).
+
+---
+
+## Runbook operativo resumido
+
+1. Levantar infra base:
+
+```bash
+docker compose -f infra/minio/docker-compose.yml up -d
 ```
 
-Pipeline completo validado: **MinIO → REST Catalog → PyIceberg → Arrow**
+2. Re-registrar tablas si hay perdida de volumen `iceberg_catalog`:
 
-### Deuda técnica registrada
+```bash
+mamba run -n wow-telemetry python scripts/bootstrap/register_tables_rest_catalog.py
+```
 
-**DT-8.2-01:** Si el volumen `iceberg_catalog` se pierde, re-ejecutar
-`scripts/bootstrap/register_tables_rest_catalog.py`. El script resuelve
-automáticamente la versión de metadata más reciente — no requiere edición manual.
+3. Validar disponibilidad:
 
-### Siguiente paso
+```bash
+curl -sf http://localhost:8181/v1/config
+curl -s http://localhost:8000/health/readiness
+```
 
-Implementar `src/api/services/iceberg_service.py` (PyIceberg + DuckDB)
-para ser consumido por los endpoints FastAPI.
+4. Referencia operativa extendida: `docs/fase_8_runbook_operativo.md`.
+
+---
+
+## Limites pendientes / deuda abierta
+
+- Si el volumen de SQLite del REST Catalog se pierde, se requiere bootstrap manual
+  (mitigado por script idempotente).
+- El smoke de integracion `tests/integration/test_iceberg_rest_catalog_smoke.py`
+  depende de que el receptor Flask (`localhost:5000`) este activo por fixture global.
+- Campos legacy de dataset en endpoints (`event_date`, `raid_outcome`, `raid_dps`) pueden
+  llegar en `null` segun snapshots Gold actuales; no rompe contrato porque son opcionales.
+
+---
+
+## Criterios Go/No-Go (resumen)
+
+**GO** cuando:
+
+- `tests/api` pasa completo.
+- smoke de catalogo (`tests/integration/test_iceberg_rest_catalog_smoke.py`) pasa.
+- smoke de negocio con catalogo real pasa.
+- `/health/readiness` devuelve `ready=true` y `missing_tables=[]`.
+
+**NO-GO** cuando:
+
+- readiness devuelve `503` o faltan tablas en catalogo.
+- endpoints de negocio responden `503` por falla de backend.
+- smoke tests quedan en `skip` por falta de servicios externos levantados.
+
+Resultados reales de validacion manual: `docs/evidence/fase_8_evidencias.md`.
